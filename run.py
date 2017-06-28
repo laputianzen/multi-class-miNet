@@ -30,6 +30,7 @@ def main():
     #NUM_CLASS = len(tacticName)
     #C5k k=3,2,5
     FLAGS.C5k_CLASS = [[0,1,2,3,5,7],[6,9],[4,8]]
+    FLAGS.k = [3,2,5]
     
     #instNet_shape = [1040,130,10,1] #[1040,10,1]
     instNet_shape = np.array([[1040,130,10,len(FLAGS.C5k_CLASS[0])],

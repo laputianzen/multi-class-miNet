@@ -327,48 +327,51 @@ def main_unsupervised(ae_shape,fold,FLAGS):
     
     #aeList = [aeC53, aeC52, aeC55]
     
-    writer = tf.summary.FileWriter('logs',tf.get_default_graph())
+    writer = tf.summary.FileWriter('logs/pretraining',tf.get_default_graph())
     writer.close()
     
     learning_rates = FLAGS.pre_layer_learning_rate
     
 #for fold in range(5):
     print('fold %d' %(fold+1))
-    datadir = 'dataGood/multiPlayers/syncLargeZoneVelocitySoftAssign(R=16,s=10)/train/fold%d' %(fold+1)
-    fileName= 'EVZoneVelocitySoftAssign(R=16,s=10)3_training%d.mat' %(fold+1)
-
-    batch_X, batch_Y, _ = readmat.read(datadir,fileName)
-    num_train = len(batch_Y)
-
+    for k in range(len(ae_shape)):
+        tactic = FLAGS.tacticName[FLAGS.C5k_CLASS[k][0]]
+        datadir = 'dataGood/multiPlayers/syncLargeZoneVelocitySoftAssign(R=16,s=10)/train/fold%d/pretraining' %(fold+1)
+        fileName= '%sZoneVelocitySoftAssign(R=16,s=10)%d_training%d.mat' %(tactic,FLAGS.k[k],fold+1)
     
-    testdir = 'dataGood/multiPlayers/syncLargeZoneVelocitySoftAssign(R=16,s=10)/test/fold%d' %(fold+1)
-    testFileName= 'EVZoneVelocitySoftAssign(R=16,s=10)3_test%d.mat' %(fold+1) 
-    test_X, test_Y, test_label = readmat.read(testdir,testFileName)    
+        batch_X, batch_Y, _ = readmat.read(datadir,fileName)
+        num_train = len(batch_Y)
+    
+        
+        testdir = 'dataGood/multiPlayers/syncLargeZoneVelocitySoftAssign(R=16,s=10)/test/fold%d' %(fold+1)
+        testFileName= '%sZoneVelocitySoftAssign(R=16,s=10)%d_test%d.mat' %(tactic,FLAGS.k[k],fold+1) 
+        test_X, test_Y, test_label = readmat.read(testdir,testFileName)    
 
-    print("\nae_shape has %s pretarined layer" %(len(ae_shape)-2))
-    for i in range(len(ae_shape) - 2):
-        n = i + 1
-        _pretrain_model_dir = '{0}/{1}/pretrain{2}'.format(_chkpt_dir,fold+1,n)
-        if not os.path.exists(_pretrain_model_dir):
-            os.makedirs(_pretrain_model_dir)
+        print("\nae_shape has %s pretarined layer" %(len(ae_shape[k])-2))
+        for i in range(len(ae_shape[k]) - 2):
+            n = i + 1
+            _pretrain_model_dir = '{0}/{1}/C5{2}/pretrain{3}/'.format(_chkpt_dir,fold+1,FLAGS.k[k],n)
+            if not os.path.exists(_pretrain_model_dir):
+                os.makedirs(_pretrain_model_dir)
             
-        with tf.variable_scope("pretrain_{0}".format(n)):
-            input_ = tf.placeholder(dtype=tf.float32,
-                                shape=(FLAGS.pretrain_batch_size, ae_shape[0]),
-                                name='ae_input_pl')
-            target_ = tf.placeholder(dtype=tf.float32,
-                                 shape=(FLAGS.pretrain_batch_size, ae_shape[0]),
-                                 name='ae_target_pl')
-            layer = ae.pretrain_net(input_, n)
+            with tf.variable_scope("pretrain_{0}".format(n)):
+                input_ = tf.placeholder(dtype=tf.float32,
+                                        shape=(FLAGS.pretrain_batch_size, ae_shape[k][0]),
+                                        name='ae_input_pl')
+                target_ = tf.placeholder(dtype=tf.float32,
+                                         shape=(FLAGS.pretrain_batch_size, ae_shape[k][0]),
+                                         name='ae_target_pl')
+                layer = aeList[k].pretrain_net(input_, n)
 
-            with tf.name_scope("target"):
-                target_for_loss = ae.pretrain_net(target_, n, is_target=True)
-
-            if n == ae.num_hidden_layers+1:
-                loss = loss_x_entropy(layer, target_for_loss)
-            else:
-                loss = tf.sqrt(tf.nn.l2_loss(tf.subtract(layer, target_for_loss)))
-            train_op, global_step = training(loss, learning_rates[i], i)
+                with tf.name_scope("target"):
+                    target_for_loss = aeList[k].pretrain_net(target_, n, is_target=True)
+                    
+                if n == aeList[k].num_hidden_layers+1:
+                    loss = loss_x_entropy(layer, target_for_loss)
+                else:
+                    loss = tf.sqrt(tf.nn.l2_loss(tf.subtract(layer, target_for_loss)))
+                        
+                train_op, global_step = training(loss, learning_rates[i], i)
     
             #summary_dir = pjoin(FLAGS.summary_dir, 'pretraining_{0}'.format(n))
             #summary_writer = tf.train.SummaryWriter(summary_dir,
@@ -381,53 +384,53 @@ def main_unsupervised(ae_shape,fold,FLAGS):
             #hist_summarries.append(loss_summaries[i])
             #summary_op = tf.merge_summary(hist_summarries)
 
-            vars_to_init = ae.get_variables_to_init(n)
-            vars_to_init.append(global_step)
+                vars_to_init = aeList[k].get_variables_to_init(n)
+                vars_to_init.append(global_step)
             
                     
-            saver = tf.train.Saver(vars_to_init)
-            model_ckpt = _pretrain_model_dir+ '/model.ckpt'    
+                saver = tf.train.Saver(vars_to_init)
+                model_ckpt = _pretrain_model_dir+ 'model.ckpt'    
             
-            if os.path.isfile(model_ckpt+'.meta'):
-                #tf.reset_default_graph()
-                print("|---------------|---------------|---------|----------|")
-                saver.restore(sess, model_ckpt)
-                for v in vars_to_init:
-                    print("%s with value %s" % (v.name, sess.run(tf.is_variable_initialized(v))))
+                if os.path.isfile(model_ckpt+'.meta'):
+                    #tf.reset_default_graph()
+                    print("|---------------|---------------|---------|----------|")
+                    saver.restore(sess, model_ckpt)
+                    for v in vars_to_init:
+                        print("%s with value %s" % (v.name, sess.run(tf.is_variable_initialized(v))))
 #                text_file = open("Reload.txt", "a")
 #                for b in range(len(ae_shape) - 2):
 #                    if sess.run(tf.is_variable_initialized(ae._b(b+1))):
 #                        #print("%s with value in [pretrain %s]\n %s" % (ae._b(b+1).name, n, ae._b(b+1).eval(sess)))
 #                        text_file.write("%s with value in [pretrain %s]\n %s\n" % (ae._b(b+1).name, n, ae._b(b+1).eval(sess)))
 #                text_file.close()                    
-            else:
-                sess.run(tf.variables_initializer(vars_to_init))
-                print("\n\n")
-                print("| Training Step | Cross Entropy |  Layer  |   Epoch  |")
-                print("|---------------|---------------|---------|----------|")
+                else:
+                    sess.run(tf.variables_initializer(vars_to_init))
+                    print("\n\n")
+                    print("| Training Step | Cross Entropy |  Layer  |   Epoch  |")
+                    print("|---------------|---------------|---------|----------|")
         
-                for epochs in range(FLAGS.pretraining_epochs):
-                    perm = np.arange(num_train)
-                    np.random.shuffle(perm)
-                    for step in range(int(num_train/FLAGS.pretrain_batch_size)):
-                        selectIndex = perm[FLAGS.pretrain_batch_size*step:FLAGS.pretrain_batch_size*step+FLAGS.pretrain_batch_size]
-                        for I in range(len(batch_X[0])):
+                    for epochs in range(FLAGS.pretraining_epochs):
+                        perm = np.arange(num_train)
+                        np.random.shuffle(perm)
+                        for step in range(int(num_train/FLAGS.pretrain_batch_size)):
+                            selectIndex = perm[FLAGS.pretrain_batch_size*step:FLAGS.pretrain_batch_size*step+FLAGS.pretrain_batch_size]
+                            for I in range(len(batch_X[0])):
                             #input_feed = batch_X[perm[2*step:2*step+2],i,:]
                             ##target_feed = batch_Y[2*step:2*step+2,1]
                             #target_feed = batch_X[perm[2*step:2*step+2],i,:]
                             #feed_dict = {input_: input_feed,target_: target_feed}
                             #feed_dict = fill_feed_dict_ae(data.train, input_, target_, noise[i])
-                            input_feed = batch_X[selectIndex,I,:]
-                            target_feed = batch_X[selectIndex,I,:]
-                            loss_summary, loss_value = sess.run([train_op, loss],
-                                                            feed_dict={
-                                                                input_: input_feed,
-                                                                target_: target_feed
-                                                                })
-                    
-                            count = epochs*num_train*len(batch_X[0])+step*len(batch_X[0])*len(input_feed)+(I+1)*len(input_feed)
+                                input_feed = batch_X[selectIndex,I,:]
+                                target_feed = batch_X[selectIndex,I,:]
+                                loss_summary, loss_value = sess.run([train_op, loss],
+                                                                feed_dict={
+                                                                    input_: input_feed,
+                                                                    target_: target_feed
+                                                                    })
+
+                                count = epochs*num_train*len(batch_X[0])+step*len(batch_X[0])*len(input_feed)+(I+1)*len(input_feed)
                             #if count % 100 == 0:
-                            if count % (10*len(input_feed)*len(batch_X[0])) == 0:
+                                if count % (10*len(input_feed)*len(batch_X[0])) == 0:
                         #summary_str = sess.run(summary_op, feed_dict=feed_dict)
                         #summary_writer.add_summary(summary_str, step)
                         #image_summary_op = \
@@ -442,10 +445,10 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                         #                       feed_dict=feed_dict)
                         #summary_writer.add_summary(summary_img_str)
         
-                                output = "| {0:>13} | {1:13.4f} | Layer {2} | Epoch {3}  |"\
-                                        .format(count, loss_value, n, epochs + 1)
+                                    output = "| {0:>13} | {1:13.4f} | Layer {2} | Epoch {3}  |"\
+                                            .format(count, loss_value, n, epochs + 1)
         
-                                print(output)
+                                    print(output)
                                 
 #                text_file = open("Output.txt", "a")
 #                for b in range(len(ae_shape) - 2):
@@ -453,12 +456,12 @@ def main_unsupervised(ae_shape,fold,FLAGS):
 #                        #print("%s with value in [pretrain %s]\n %s" % (ae._b(b+1).name, n, ae._b(b+1).eval(sess)))
 #                        text_file.write("%s with value in [pretrain %s]\n %s\n" % (ae._b(b+1).name, n, ae._b(b+1).eval(sess)))
 #                text_file.close()
-                save_path = saver.save(sess, model_ckpt)
-                print("Model saved in file: %s" % save_path)
+                    save_path = saver.save(sess, model_ckpt)
+                    print("Model saved in file: %s" % save_path)
                 #input("\nPress ENTER to CONTINUE\n")  
     
-    time.sleep(0.5)                                          
-    return ae
+        time.sleep(0.5)                                          
+    return aeList
 
 def evaluation(logits, labels):
     """Evaluate the quality of the logits at predicting the label.
