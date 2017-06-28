@@ -57,6 +57,40 @@ def read(datadir, fileName):
     
     #print(Y)
     return X,Y,labels
+
+def multi_class_read(datadir,file_str,num_inst,FLAGS):
+    instIdx = np.insert(np.cumsum(num_inst),0,0)
+    newIdx = 0
+    for k in range(len(FLAGS.k)):
+        for c in range(len(FLAGS.C5k_CLASS[k])):
+            tactic = FLAGS.tacticName[FLAGS.C5k_CLASS[k][c]]
+            fileName= file_str.format(tactic,FLAGS.k[k])
+            data_X, data_Y, data_KIlabel = read(datadir,fileName)
+            data_KPlabel = Inst2Player(data_KIlabel,FLAGS.playerMap[k])
+            if k == 0 and c == 0:
+                multi_X = np.zeros([data_X.shape[0],np.sum(num_inst),data_X.shape[2]])
+                multi_Y = np.zeros([data_Y.shape[0],len(FLAGS.tacticName)]) 
+                multi_KPlabel = np.zeros([len(data_KIlabel),5])
+            
+            if c == 0:
+                multi_X[:,instIdx[k]:instIdx[k+1],:] = data_X
+            
+            multi_Y[:,newIdx:newIdx+1] = data_Y
+            #KP outside positive bag is 0, so we can use addition to replace concatenate
+            multi_KPlabel = multi_KPlabel + data_KPlabel  
+            newIdx = newIdx+1
+            #multi_KPlabel
+    return multi_X, multi_Y, multi_KPlabel
+
+def Inst2Player(KIlabel,playerMap):
+    KPlabel = np.zeros([len(KIlabel),5])
+    vid, inst = np.nonzero(KIlabel)
+    for v in range(len(vid)):
+        KPlabel[vid[v],:] = playerMap[inst[v]]
+        
+    return KPlabel
+        
+        
     
 
 if __name__ == "__main__":

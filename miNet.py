@@ -572,17 +572,16 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
         print("")
         print('fold %d' %(fold+1))
         datadir = 'dataGood/multiPlayers/syncLargeZoneVelocitySoftAssign(R=16,s=10)/train/fold%d' %(fold+1)
-        fileName= 'EVZoneVelocitySoftAssign(R=16,s=10)3_training%d.mat' %(fold+1)
+        file_str= '{0}ZoneVelocitySoftAssign(R=16,s=10){1}_training%d.mat' %(fold+1)
 
-        batch_X, batch_Y, _ = readmat.read(datadir,fileName)
-        num_train = len(batch_Y)
+        batch_multi_X, batch_multi_Y, batch_multi_KPlabel = readmat.multi_class_read(datadir,file_str,num_inst,FLAGS)
         
         testdir = 'dataGood/multiPlayers/syncLargeZoneVelocitySoftAssign(R=16,s=10)/test/fold%d' %(fold+1)
-        testFileName= 'EVZoneVelocitySoftAssign(R=16,s=10)3_test%d.mat' %(fold+1) 
-        test_X, test_Y, test_label = readmat.read(testdir,testFileName)        
+        test_file_str= '{0}ZoneVelocitySoftAssign(R=16,s=10){1}_test%d.mat' %(fold+1) 
+        test_multi_X, test_multi_Y, test_multi_label = readmat.multi_class_read(testdir,test_file_str,num_inst,FLAGS)       
         
         if FLAGS.finetune_batch_size is None:
-            FLAGS.finetune_batch_size = len(test_Y)
+            FLAGS.finetune_batch_size = len(test_multi_Y)
             
         NUM_CLASS = len(FLAGS.tacticName)
         Y_placeholder = tf.placeholder(tf.int32,
