@@ -474,7 +474,7 @@ def main_unsupervised(ae_shape,fold,FLAGS):
         time.sleep(0.5)                                          
     return aeList
 
-def evaluation(logits, labels):
+def multiClassEvaluation(logits, labels):
     """Evaluate the quality of the logits at predicting the label.
     
     Args:
@@ -486,7 +486,7 @@ def evaluation(logits, labels):
         A scalar int32 tensor with the number of examples (out of batch_size)
         that were predicted correctly.
         """    
-    correct_prediction = tf.equal(tf.round(logits), tf.cast(labels,tf.float32))
+    correct_prediction = tf.equal(tf.argmax(logits,1), tf.argmax(labels,1))
     return tf.reduce_mean(tf.cast(correct_prediction, tf.float32))    
 
 def calculateKP(accu,kinst,fold,test_Y,test_label):
@@ -601,7 +601,7 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
                                 labels=tf.cast(Y_placeholder, tf.float32),name='softmax_cross_entropy'))
         #loss = loss_supervised(logits, labels_placeholder)
         train_op, global_step = training(loss, FLAGS.supervised_learning_rate)
-        accu = evaluation(Y, Y_placeholder)
+        accu = multiClassEvaluation(Y, Y_placeholder)
 
     #hist_summaries = [ae['biases{0}'.format(i + 1)]
     #                  for i in xrange(ae.num_hidden_layers + 1)]
