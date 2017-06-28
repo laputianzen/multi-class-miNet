@@ -39,8 +39,8 @@ def main():
                              np.int32)    
     num_inst = np.array([10,10,1],np.int32) # 5 choose 3 key players, 5 choose 2 key players, 5 choose 3 key players 
     fold     =  0
-    mi = miNet.main_unsupervised(instNet_shape,fold,FLAGS)
-    miNet.main_supervised(mi,num_inst,fold,FLAGS)
+    miList = miNet.main_unsupervised(instNet_shape,fold,FLAGS)
+    miNet.main_supervised(miList,num_inst,fold,FLAGS)
 
 if __name__ == '__main__':
     main()

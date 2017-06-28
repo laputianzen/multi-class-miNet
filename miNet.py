@@ -516,9 +516,9 @@ def calculateKP(accu,kinst,fold,test_Y,test_label):
 
 text_file = open("final_result.txt", "w")
 
-def main_supervised(instNet,num_inst,fold,FLAGS):
-    with instNet.session.graph.as_default():
-        sess = instNet.session
+def main_supervised(instNetList,num_inst,fold,FLAGS):
+    with instNetList[0].session.graph.as_default():
+        sess = instNetList[0].session
         
 #        text_file = open("FineTune.txt", "a")
 #        for b in range(instNet.num_hidden_layers + 1):
@@ -545,10 +545,10 @@ def main_supervised(instNet,num_inst,fold,FLAGS):
 #                input_var = input(">>> We found model.ckpt file. Do you want to load it [yes/no]?")
 #            if input_var == 'yes':
 #                new = False        
-        
-        input_pl = tf.placeholder(tf.float32, shape=(num_inst,None,
-                                                instNet.shape[0]),name='input_pl')
-        Y, kinst = instNet.MIL(input_pl)
+        for k in range(len(instNetList)):
+            input_pl = tf.placeholder(tf.float32, shape=(num_inst[k],None,
+                                                instNetList[k].shape[0]),name='input_pl')
+            Y, kinst = instNetList[k].MIL(input_pl)
         
 #        saver = tf.train.Saver()
 #        if new:
