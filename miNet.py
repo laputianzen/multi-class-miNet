@@ -596,7 +596,9 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
                                         shape=(None,NUM_CLASS),
                                         name='target_pl')
         
-        loss = loss_x_entropy(Y, tf.cast(Y_placeholder, tf.float32))
+        #loss = loss_x_entropy(Y, tf.cast(Y_placeholder, tf.float32))
+        loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=Y,
+                                labels=tf.cast(Y_placeholder, tf.float32),name='softmax_cross_entropy'))
         #loss = loss_supervised(logits, labels_placeholder)
         train_op, global_step = training(loss, FLAGS.supervised_learning_rate)
         accu = evaluation(Y, Y_placeholder)
@@ -633,9 +635,9 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
                 start_time = time.time()
             
                 selectIndex = perm[FLAGS.finetune_batch_size*step:FLAGS.finetune_batch_size*step+FLAGS.finetune_batch_size]
-                input_feed = batch_X[selectIndex,:,:]
+                input_feed = batch_multi_X[selectIndex,:,:]
                 input_feed = np.transpose(input_feed, (1,0,2))
-                target_feed = batch_Y[selectIndex].astype(np.int32)         
+                target_feed = batch_multi_Y[selectIndex].astype(np.int32)         
             
                 _, loss_value, logit, label = sess.run([train_op, loss, Y, Y_placeholder],
                                         feed_dict={
@@ -655,9 +657,9 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
                     text_file.write('|   Epoch %d  |  Step %d  |  loss = %.3f | (%.3f sec)\n' % (epochs+1, step, loss_value, duration))
                     # Update the events file.
                     
-            test_input_feed = np.transpose(test_X, (1,0,2))
-            test_target_feed = test_Y.astype(np.int32) 
-            bagAccu, kinst_pred = sess.run([accu, kinst],feed_dict={input_pl: test_input_feed,Y_placeholder: test_target_feed})
+            test_input_feed = np.transpose(test_multi_X, (1,0,2))
+            test_target_feed = test_multi_Y.astype(np.int32) 
+            bagAccu, inst_pred = sess.run([accu, instOuts],feed_dict={input_pl: test_input_feed,Y_placeholder: test_target_feed})
             print('Epochs %d: accuracy = %.5f '  % (epochs+1, bagAccu)) 
             text_file.write('Epochs %d: accuracy = %.5f\n\n'  % (epochs+1, bagAccu))
             
