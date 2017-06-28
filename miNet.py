@@ -489,41 +489,26 @@ def multiClassEvaluation(logits, labels):
     correct_prediction = tf.equal(tf.argmax(logits,1), tf.argmax(labels,1))
     return tf.reduce_mean(tf.cast(correct_prediction, tf.float32))    
 
-def calculateKP(accu,kinst,fold,test_Y,test_label):
-    playerMap =  np.array([[1,1,1,0,0],[1,1,0,1,0],[1,1,0,0,1],[1,0,1,1,0],[1,0,1,0,1],
-                           [1,0,0,1,1],[0,1,1,1,0],[0,1,1,0,1],[0,1,0,1,1],[0,0,1,1,1]])
+def calculateAccu(Y_pred,inst_pred,test_Y,test_label,FLAGS):
+          
     
-    bagAccu = np.zeros((5,1))
-    pPrec = np.zeros((5,1))
-    pAccu = np.zeros((5,1))         
+    KP_pred = np.zeros((len(Y_pred),5))
+    for bagIdx in range(len(Y_pred)):
+        for k in range(len(FLAGS.k)):
+            if Y_pred[bagIdx] in FLAGS.C5k_CLASS[k]:
+                c = FLAGS.C5k_CLASS[k].index(Y_pred[bagIdx])
+                kinst = np.argmax(inst_pred[k][bagIdx,:,c])
+                KP_pred[bagIdx] = FLAGS.playerMap[k][kinst]
+                
+    Y_correct = np.equal(Y_pred,np.argmax(test_Y,1))
+    bagAccu = np.sum(Y_correct) / Y_pred.size
     
-    pred_positiveBag = np.flatnonzero(kinst)
-    pred_pinst = np.zeros((len(pred_positiveBag),len(playerMap[0])))
-    for p in range(len(pred_positiveBag)):
-        k = int(kinst[int(pred_positiveBag[p])]-1)
-        pred_pinst[p,:] = playerMap[k]
-            
-    test_positiveBag = np.flatnonzero(test_Y)
-    test_pinst = np.zeros((len(test_positiveBag),len(playerMap[0])))
-    test_kinst = np.zeros((len(test_positiveBag),1))
-    for t in range(len(test_positiveBag)):
-        pidx = test_positiveBag[t]
-        test_kinst[t] = np.argmax(test_label[pidx,:])
-        test_pinst[t,:] = playerMap[int(test_kinst[t])]
-            
-    correct_kP = len(np.flatnonzero(np.equal(test_pinst,pred_pinst)))
-    total_P = test_pinst.shape[0]* test_pinst.shape[1]
-    pAccu[fold] = correct_kP / total_P
-            
-    total_pP = len(np.flatnonzero(np.logical_or(test_pinst,pred_pinst)))
-    tpP  = len(np.flatnonzero(np.logical_and(test_pinst,pred_pinst)))
-    pPrec[fold] = tpP/total_pP
-    print('bag accuracy %.5f, inst accuracy %.5f, inst precision %.5f' %(accu, pAccu[fold], pPrec[fold]))
-    bagAccu[fold] = accu   
-    #input("Press ENTER to CONTINUE")
+    y_correct = np.equal(KP_pred[Y_correct,:],test_label[Y_correct,:])
     
-    text_file.write('bag accuracy %.5f, inst accuracy %.5f, inst precision %.5f\n' %(accu, pAccu[fold], pPrec[fold]))
+    pAccu = np.sum(y_correct) / KP_pred[Y_correct,:].size
+    print('bag accuracy %.5f, inst accuracy %.5f' %(bagAccu, pAccu))
     time.sleep(1)
+    return bagAccu, pAccu
 
 text_file = open("final_result.txt", "w")
 
@@ -659,14 +644,15 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
                     
             test_input_feed = np.transpose(test_multi_X, (1,0,2))
             test_target_feed = test_multi_Y.astype(np.int32) 
-            bagAccu, inst_pred = sess.run([accu, instOuts],feed_dict={input_pl: test_input_feed,Y_placeholder: test_target_feed})
+            bagAccu, Y_pred, inst_pred = sess.run([accu, tf.argmax(tf.nn.softmax(Y),axis=1), instOuts],
+                                                   feed_dict={input_pl: test_input_feed,Y_placeholder: test_target_feed})
             print('Epochs %d: accuracy = %.5f '  % (epochs+1, bagAccu)) 
             text_file.write('Epochs %d: accuracy = %.5f\n\n'  % (epochs+1, bagAccu))
             
-            baseline = 1-len(test_Y.nonzero())/len(test_Y)
-            if bagAccu > baseline:
-                calculateKP(bagAccu,kinst_pred,fold,test_Y,test_label)
-            print("")
+            #baseline = 1-len(test_Y.nonzero())/len(test_Y)
+            #if bagAccu > baseline:
+            calculateAccu(Y_pred,inst_pred,test_multi_Y,test_multi_label,FLAGS)
+            #print("")
 
                     #summary_str = sess.run(summary_op, feed_dict=feed_dict)
                     #summary_writer.add_summary(summary_str, step)
@@ -714,17 +700,15 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
 #        else:
 #            saver = tf.train.import_meta_graph(model_ckpt+'.meta')
 #            saver.restore(sess, model_ckpt)                    
-            
-        input_feed = np.transpose(test_X, (1,0,2))
-        target_feed = test_Y.astype(np.int32) 
-        bagAccu, kinst_pred = sess.run([accu, kinst],feed_dict={input_pl: input_feed,Y_placeholder: target_feed})
-        baseline = 1-len(test_Y.nonzero())/len(test_Y)
-        print('After %d Epochs: accuracy = %.5f (baseline: %.5f)'  % (epochs+1, bagAccu, baseline))
-        text_file.write('After %d Epochs: accuracy = %.5f (baseline: %.5f)'  % (epochs+1, bagAccu, baseline))
+           
+        input_feed = np.transpose(test_multi_X, (1,0,2))
+        target_feed = test_multi_Y.astype(np.int32) 
+        bagAccu, Y_pred, inst_pred = sess.run([accu, tf.argmax(tf.nn.softmax(Y),axis=1), instOuts],
+                                               feed_dict={input_pl: test_input_feed,Y_placeholder: test_target_feed})
+        
+        print('\nAfter %d Epochs: accuracy = %.5f'  % (epochs+1, bagAccu))
+        calculateAccu(Y_pred,inst_pred,test_multi_Y,test_multi_label,FLAGS)
         time.sleep(0.5)
  
-        if bagAccu > baseline:
-            calculateKP(bagAccu,kinst_pred,fold,test_Y,test_label)
-            
-        text_file.close()
-            
+        writer = tf.summary.FileWriter('logs/fine-tuning',tf.get_default_graph())
+        writer.close()           
