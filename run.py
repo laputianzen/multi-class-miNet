@@ -28,14 +28,13 @@ def main():
     FLAGS.tacticName =['F23','EV','HK','PD','PT','RB','SP','WS','WV','WW']
     #tacticNumKP=[3,3,3,3,5,3,2,3,5,2]
     #NUM_CLASS = len(tacticName)
-    FLAGS.C53_CLASS = [0,1,2,3,5,7]
-    FLAGS.C52_CLASS = [6,9]
-    FLAGS.C55_CLASS = [4,8]
+    #C5k k=3,2,5
+    FLAGS.C5k_CLASS = [[0,1,2,3,5,7],[6,9],[4,8]]
     
     #instNet_shape = [1040,130,10,1] #[1040,10,1]
-    instNet_shape = np.array([[1040,130,10,len(FLAGS.C53_CLASS)],
-                              [1040,130,10,len(FLAGS.C52_CLASS)],
-                              [1040,130,10,len(FLAGS.C55_CLASS)]],
+    instNet_shape = np.array([[1040,130,10,len(FLAGS.C5k_CLASS[0])],
+                              [1040,130,10,len(FLAGS.C5k_CLASS[1])],
+                              [1040,130,10,len(FLAGS.C5k_CLASS[2])]],
                              np.int32)    
     num_inst = np.array([10,10,1],np.int32) # 5 choose 3 key players, 5 choose 2 key players, 5 choose 3 key players 
     fold     =  0
