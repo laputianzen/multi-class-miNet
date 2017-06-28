@@ -219,7 +219,8 @@ class miNet(object):
         return last_output
     
     def MIL(self,input_plist):
-        #input_dim = self.shape[0] 
+        #input_dim = self.shape[0]
+        tmpList = list()
         for i in range(input_plist.shape[0]):
             name_input = self._inputs_str.format(i + 1)
             #self[name_input] = tf.placeholder(tf.float32,[None, input_dim])
@@ -235,21 +236,28 @@ class miNet(object):
                 else:    
                     self[name_instNet] = self.single_instNet(self[name_input])
             
-            if not i == 0:
-                self["y"]  = tf.concat([self["y"],self[name_instNet]],1)
-            else:
-                self["y"] = self[name_instNet]
-            
-        self["Y"] =  tf.reduce_max(self["y"],axis=1,name="MILPool",keep_dims=True)
-        topInstIdx = tf.reshape(tf.argmax(self["y"],axis=1),[-1,1])
+            tmpList.append(self[name_instNet])
+            #if not i == 0:
+                #self["y"]  = tf.concat([self["y"],self[name_instNet]],1)
+            #    self["y"]  = [self["y"],self[name_instNet]]
+            #else:
+            #    self["y"] = self[name_instNet]
+        
+        self["y"] = tf.stack(tmpList,axis=1)
+        self["Y"] =  tf.reduce_max(self["y"],axis=1,name="MILPool")#,keep_dims=True)
+        
         #batch_size = int(self["y"].shape[0])
         #topInstIdx = tf.reshape(tf.argmax(self["y"],axis=1),[batch_size,1])
         #self["kinst"] = tf.multiply(tf.round(self["Y"]),
         #    tf.cast(tf.argmax(self["y"],axis=1)+1,tf.float32),name='key_instance')
-        self["kinst"] = tf.multiply(tf.round(self["Y"]),
-            tf.cast(topInstIdx+1,tf.float32),name='key_instance')
         
-        return self["Y"], self["kinst"]
+        #topInstIdx = tf.argmax(self["y"],axis=1)
+        #self["kinst"] = tf.multiply(tf.round(self["Y"]),
+        #    tf.cast(topInstIdx+1,tf.float32),name='key_instance')
+        # consider tf.expand_dims to support tf.argmax
+        
+        #return self["Y"], self["kinst"]
+        return self["Y"], self["y"]
 
 
 loss_summaries = {}
@@ -544,12 +552,21 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
 #            while input_var not in ['yes', 'no']:
 #                input_var = input(">>> We found model.ckpt file. Do you want to load it [yes/no]?")
 #            if input_var == 'yes':
-#                new = False        
-        for k in range(len(instNetList)):
-            input_pl = tf.placeholder(tf.float32, shape=(num_inst[k],None,
-                                                instNetList[k].shape[0]),name='input_pl')
-            Y, kinst = instNetList[k].MIL(input_pl)
+#                new = False
+        bagOuts = []
+        instOuts = []
+        totalNumInst = np.sum(num_inst)
+        instIdx = np.insert(np.cumsum(num_inst),0,0)
+        input_pl = tf.placeholder(tf.float32, shape=(totalNumInst,None,
+                                                instNetList[0].shape[0]),name='input_pl')
+        for k in range(len(instNetList)):            
+            out_Y, out_y = instNetList[k].MIL(input_pl[instIdx[k]:instIdx[k+1]])
+            #bagOuts.append(tf.transpose(out_Y,perm=[1,0]))
+            bagOuts.append(out_Y)
+            instOuts.append(out_y)
         
+        #Y = tf.dynamic_stitch(FLAGS.C5k_CLASS,bagOuts)
+        Y = tf.concat(bagOuts,1)
 #        saver = tf.train.Saver()
 #        if new:
         print("")
@@ -566,8 +583,10 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
         
         if FLAGS.finetune_batch_size is None:
             FLAGS.finetune_batch_size = len(test_Y)
+            
+        NUM_CLASS = len(FLAGS.tacticName)
         Y_placeholder = tf.placeholder(tf.int32,
-                                        shape=(None,1),
+                                        shape=(None,NUM_CLASS),
                                         name='target_pl')
         
         loss = loss_x_entropy(Y, tf.cast(Y_placeholder, tf.float32))
