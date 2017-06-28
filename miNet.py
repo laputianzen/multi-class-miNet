@@ -318,13 +318,14 @@ def main_unsupervised(ae_shape,fold,FLAGS):
     tf.reset_default_graph()
     sess = tf.Session()
    
-    #num_hidden = len(ae_shape)-2
-
-    #ae_shape = [FLAGS.image_pixels] + ae_hidden_shapes + [FLAGS.num_classes]
-
-    ae = miNet(ae_shape, sess)
-    ae1= miNet(ae_shape, sess)
-    ae2= miNet(ae_shape, sess)
+    aeList = list()
+    for a in range(len(ae_shape)):
+        aeList.append(miNet(ae_shape[a], sess))
+    #aeC53 = miNet(ae_shape[0], sess)
+    #aeC52 = miNet(ae_shape[1], sess)
+    #aeC55 = miNet(ae_shape[2], sess)
+    
+    #aeList = [aeC53, aeC52, aeC55]
     
     writer = tf.summary.FileWriter('logs',tf.get_default_graph())
     writer.close()
