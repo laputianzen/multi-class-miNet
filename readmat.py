@@ -25,8 +25,8 @@ def read(datadir, fileName):
     #strHello = "the length of (%s) is %d" %('Hello World',len('Hello World'))
     #print(strHello)
     
-    strBagShape = "the shape of bags is ({0},{1})".format(bags.shape[0],bags.shape[1])
-    print(strBagShape)
+#    strBagShape = "the shape of bags is ({0},{1})".format(bags.shape[0],bags.shape[1])
+#    print(strBagShape)
     #print(bags.shape)
     
     bagNum = len(bags['instance'][0])
@@ -75,6 +75,7 @@ def multi_class_read(datadir,file_str,num_inst,FLAGS):
             if c == 0:
                 multi_X[:,instIdx[k]:instIdx[k+1],:] = data_X
             
+            # change original tactic order to multi-mi-Net order
             multi_Y[:,newIdx:newIdx+1] = data_Y
             #KP outside positive bag is 0, so we can use addition to replace concatenate
             multi_KPlabel = multi_KPlabel + data_KPlabel  

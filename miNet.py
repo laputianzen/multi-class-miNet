@@ -349,12 +349,15 @@ def main_unsupervised(ae_shape,fold,FLAGS):
     
         batch_X, batch_Y, _ = readmat.read(datadir,fileName)
         num_train = len(batch_Y)
-    
+        strBagShape = "the shape of bags is ({0},{1})".format(batch_Y.shape[0],batch_Y.shape[1])
+        print(strBagShape)   
         
         testdir = 'dataGood/multiPlayers/syncLargeZoneVelocitySoftAssign(R=16,s=10)/test/fold%d' %(fold+1)
         testFileName= '%sZoneVelocitySoftAssign(R=16,s=10)%d_test%d.mat' %(tactic,FLAGS.k[k],fold+1) 
         test_X, test_Y, test_label = readmat.read(testdir,testFileName)    
-
+        strBagShape = "the shape of bags is ({0},{1})".format(test_Y.shape[0],test_Y.shape[1])
+        print(strBagShape)  
+        
         print("\nae_shape has %s pretarined layer" %(len(ae_shape[k])-2))
         for i in range(len(ae_shape[k]) - 2):
             n = i + 1
@@ -575,11 +578,16 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
         file_str= '{0}ZoneVelocitySoftAssign(R=16,s=10){1}_training%d.mat' %(fold+1)
 
         batch_multi_X, batch_multi_Y, batch_multi_KPlabel = readmat.multi_class_read(datadir,file_str,num_inst,FLAGS)
-        
+        num_train = len(batch_multi_Y)
+        strBagShape = "the shape of bags is ({0},{1})".format(batch_multi_Y.shape[0],batch_multi_Y.shape[1])
+        print(strBagShape)       
+
         testdir = 'dataGood/multiPlayers/syncLargeZoneVelocitySoftAssign(R=16,s=10)/test/fold%d' %(fold+1)
         test_file_str= '{0}ZoneVelocitySoftAssign(R=16,s=10){1}_test%d.mat' %(fold+1) 
         test_multi_X, test_multi_Y, test_multi_label = readmat.multi_class_read(testdir,test_file_str,num_inst,FLAGS)       
-        
+        strBagShape = "the shape of bags is ({0},{1})".format(test_multi_Y.shape[0],test_multi_Y.shape[1])
+        print(strBagShape)  
+      
         if FLAGS.finetune_batch_size is None:
             FLAGS.finetune_batch_size = len(test_multi_Y)
             
@@ -606,7 +614,11 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
     #                                              'fine_tuning'),
     #                                        graph_def=sess.graph_def,
     #                                        flush_secs=FLAGS.flush_secs)
-        vars_to_init = instNet.get_variables_to_init(instNet.num_hidden_layers + 1)
+        vars_to_init = []
+        for k in range(len(instNetList)):
+            instNet = instNetList[k]
+            vars_to_init.extend(instNet.get_variables_to_init(instNet.num_hidden_layers + 1))
+        
         vars_to_init.append(global_step)
         sess.run(tf.variables_initializer(vars_to_init))
         
