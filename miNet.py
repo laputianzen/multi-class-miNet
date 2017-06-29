@@ -209,7 +209,7 @@ class miNet(object):
                 acfun = "sigmoid"
             else:
                 acfun = "relu"
-            #acfun = "sigmoid"            
+            #acfun = "sigmoid" acfun = "relu"            
             # Fine tuning will be done on these variables
             w = self._w(i + 1)
             b = self._b(i + 1)
@@ -290,6 +290,8 @@ def training(loss, learning_rate, loss_key=None):
       tf.summary.histogram(var.op.name, var)
   # Create the gradient descent optimizer with the given learning rate.
   optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+  #optimizer = tf.train.AdamOptimizer(learning_rate)
+  #optimizer = tf.train.AdamOptimizer(learning_rate)
   # Create a variable to track the global step.
   global_step = tf.Variable(0, name='global_step', trainable=False)
   # Use the optimizer to apply the gradients that minimize the loss
@@ -581,9 +583,10 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
                                         shape=(None,NUM_CLASS),
                                         name='target_pl')
         
-        #loss = loss_x_entropy(Y, tf.cast(Y_placeholder, tf.float32))
+        #loss = loss_x_entropy(tf.nn.softmax(Y), tf.cast(Y_placeholder, tf.float32))
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=Y,
                                 labels=tf.cast(Y_placeholder, tf.float32),name='softmax_cross_entropy'))
+        
         #loss = loss_supervised(logits, labels_placeholder)
         train_op, global_step = training(loss, FLAGS.supervised_learning_rate)
         accu = multiClassEvaluation(Y, Y_placeholder)
