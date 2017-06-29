@@ -14,6 +14,8 @@ from os.path import join as pjoin
 
 import numpy as np
 import tensorflow as tf
+import pandas as pd 
+
 
 import readmat
 #from flags import FLAGS
@@ -655,6 +657,9 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
             #baseline = 1-len(test_Y.nonzero())/len(test_Y)
             #if bagAccu > baseline:
             calculateAccu(Y_pred,inst_pred,test_multi_Y,test_multi_label,FLAGS)
+            
+            filename = _confusion_dir + '/Fold{0}_Epoch{1}_test.csv'.format(fold,epochs)
+            ConfusionMatrix(Y_pred,test_multi_Y,FLAGS,filename)
             #print("")
 
                     #summary_str = sess.run(summary_op, feed_dict=feed_dict)
@@ -712,6 +717,35 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
         print('\nAfter %d Epochs: accuracy = %.5f'  % (epochs+1, bagAccu))
         calculateAccu(Y_pred,inst_pred,test_multi_Y,test_multi_label,FLAGS)
         time.sleep(0.5)
+        filename = _confusion_dir + '/Fold{0}_Epoch{1}_test_final.csv'.format(fold,epochs)
+        ConfusionMatrix(Y_pred,test_multi_Y,FLAGS,filename)        
  
         writer = tf.summary.FileWriter('logs/fine-tuning',tf.get_default_graph())
         writer.close()           
+
+def ConfusionMatrix(logits,labels,FLAGS,filename):
+    C = np.zeros((len(FLAGS.tacticName),len(FLAGS.tacticName)))
+    CM = C    
+    flattenC5k = [val for sublist in FLAGS.C5k_CLASS for val in sublist]
+    for bagIdx in range(len(labels)):
+        gt = np.argmax(labels[bagIdx])
+        #pred = np.argmax(logits[bagIdx])
+        pred = logits[bagIdx]
+        new_gt = flattenC5k[gt]
+        new_pred= flattenC5k[pred]
+        C[new_gt,new_pred] = C[new_gt,new_pred] + 1
+        
+    print(C)
+    cumC = np.sum(C,axis=1)
+    
+    for p in range(len(C)):
+        CM[p,:] = np.divide(C[p,:],cumC[p])
+    
+    df = pd.DataFrame(CM)
+    df.round(3)
+    df.to_csv(filename)    
+        
+        
+_confusion_dir = 'confusionMatrix'
+if not os.path.exists(_confusion_dir):
+    os.mkdir(_confusion_dir)      
