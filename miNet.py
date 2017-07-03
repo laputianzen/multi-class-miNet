@@ -339,8 +339,9 @@ def main_unsupervised(ae_shape,fold,FLAGS):
     
     #aeList = [aeC53, aeC52, aeC55]
     
-    writer = tf.summary.FileWriter('logs/pretraining',tf.get_default_graph())
-    writer.close()
+    writer = tf.summary.FileWriter(pjoin(FLAGS.summary_dir,
+                                      'pre_training'),tf.get_default_graph())
+    writer.close()  
     
     learning_rates = FLAGS.pre_layer_learning_rate
     
@@ -348,7 +349,8 @@ def main_unsupervised(ae_shape,fold,FLAGS):
     print('fold %d' %(fold+1))
     for k in range(len(ae_shape)):
         tactic = FLAGS.tacticName[FLAGS.C5k_CLASS[k][0]]
-        datadir = 'dataGood/multiPlayers/syncLargeZoneVelocitySoftAssign(R=16,s=10)/train/fold%d/pretraining' %(fold+1)
+        #datadir = 'dataGood/multiPlayers/syncLargeZoneVelocitySoftAssign(R=16,s=10)/train/fold%d/pretraining' %(fold+1)
+        datadir = 'dataGood/multiPlayers/syncLargeZoneVelocitySoftAssign(R=16,s=10)/train/fold%d/' %(fold+1)
         fileName= '%sZoneVelocitySoftAssign(R=16,s=10)%d_training%d.mat' %(tactic,FLAGS.k[k],fold+1)
     
         batch_X, batch_Y, _ = readmat.read(datadir,fileName)
@@ -369,7 +371,7 @@ def main_unsupervised(ae_shape,fold,FLAGS):
             if not os.path.exists(_pretrain_model_dir):
                 os.makedirs(_pretrain_model_dir)
             
-            with tf.variable_scope("pretrain_{0}".format(n)):
+            with tf.variable_scope("pretrain_{0}_mi{1}".format(n,k+1)):
                 input_ = tf.placeholder(dtype=tf.float32,
                                         shape=(FLAGS.pretrain_batch_size, ae_shape[k][0]),
                                         name='ae_input_pl')
@@ -388,16 +390,16 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                         
                 train_op, global_step = training(loss, learning_rates[i], i)
     
-            #summary_dir = pjoin(FLAGS.summary_dir, 'pretraining_{0}'.format(n))
-            #summary_writer = tf.train.SummaryWriter(summary_dir,
-            #                                        graph_def=sess.graph_def,
-            #                                        flush_secs=FLAGS.flush_secs)
-            #summary_vars = [ae["biases{0}".format(n)], ae["weights{0}".format(n)]]
+                summary_dir = pjoin(FLAGS.summary_dir, 'fold{0}/mi{1}/pretraining_{2}'.format(fold+1,k+1,n))
+                summary_writer = tf.summary.FileWriter(summary_dir,
+                                                        graph_def=sess.graph_def,
+                                                        flush_secs=FLAGS.flush_secs)
+                summary_vars = [aeList[k]["biases{0}".format(n)], aeList[k]["weights{0}".format(n)]]
     
-            #hist_summarries = [tf.histogram_summary(v.op.name, v)
-            #                   for v in summary_vars]
-            #hist_summarries.append(loss_summaries[i])
-            #summary_op = tf.merge_summary(hist_summarries)
+                hist_summarries = [tf.summary.histogram(v.op.name, v)
+                               for v in summary_vars]
+                hist_summarries.append(loss_summaries[i])
+                summary_op = tf.summary.merge(hist_summarries)
 
                 vars_to_init = aeList[k].get_variables_to_init(n)
                 vars_to_init.append(global_step)
@@ -419,6 +421,7 @@ def main_unsupervised(ae_shape,fold,FLAGS):
 #                        text_file.write("%s with value in [pretrain %s]\n %s\n" % (ae._b(b+1).name, n, ae._b(b+1).eval(sess)))
 #                text_file.close()                    
                 else:
+
                     sess.run(tf.variables_initializer(vars_to_init))
                     print("\n\n")
                     print("| Training Step | Cross Entropy |  Layer  |   Epoch  |")
@@ -446,8 +449,11 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                                 count = epochs*num_train*len(batch_X[0])+step*len(batch_X[0])*len(input_feed)+(I+1)*len(input_feed)
                             #if count % 100 == 0:
                                 if count % (10*len(input_feed)*len(batch_X[0])) == 0:
-                        #summary_str = sess.run(summary_op, feed_dict=feed_dict)
-                        #summary_writer.add_summary(summary_str, step)
+                                    summary_str = sess.run(summary_op, feed_dict={
+                                                                    input_: input_feed,
+                                                                    target_: target_feed
+                                                                    })
+                                    summary_writer.add_summary(summary_str, count)
                         #image_summary_op = \
                         #tf.image_summary("training_images",
                         #                 tf.reshape(input_,
@@ -464,7 +470,7 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                                             .format(count, loss_value, n, epochs + 1)
         
                                     print(output)
-                                
+                    summary_writer.close()         
 #                text_file = open("Output.txt", "a")
 #                for b in range(len(ae_shape) - 2):
 #                    if sess.run(tf.is_variable_initialized(ae._b(b+1))):
@@ -473,9 +479,11 @@ def main_unsupervised(ae_shape,fold,FLAGS):
 #                text_file.close()
                     save_path = saver.save(sess, model_ckpt)
                     print("Model saved in file: %s" % save_path)
+                                      
                 #input("\nPress ENTER to CONTINUE\n")  
     
-        time.sleep(0.5)                                          
+        time.sleep(0.5)
+                                      
     return aeList
 
 def multiClassEvaluation(logits, labels):
@@ -551,11 +559,22 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
         instIdx = np.insert(np.cumsum(num_inst),0,0)
         input_pl = tf.placeholder(tf.float32, shape=(totalNumInst,None,
                                                 instNetList[0].shape[0]),name='input_pl')
+
+        hist_summaries = []
         for k in range(len(instNetList)):            
             out_Y, out_y = instNetList[k].MIL(input_pl[instIdx[k]:instIdx[k+1]])
             #bagOuts.append(tf.transpose(out_Y,perm=[1,0]))
             bagOuts.append(out_Y)
             instOuts.append(out_y)
+            
+            hist_summaries.extend([instNetList[k]['biases{0}'.format(i + 1)]
+                              for i in range(instNetList[k].num_hidden_layers + 1)])
+            hist_summaries.extend([instNetList[k]['weights{0}'.format(i + 1)]
+                                   for i in range(instNetList[k].num_hidden_layers + 1)])
+    
+        hist_summaries = [tf.summary.histogram(v.op.name + "_fine_tuning", v)
+                              for v in hist_summaries]
+        summary_op = tf.summary.merge(hist_summaries)            
         
         #Y = tf.dynamic_stitch(FLAGS.C5k_CLASS,bagOuts)
         Y = tf.concat(bagOuts,1)
@@ -588,24 +607,21 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
         #loss = loss_x_entropy(tf.nn.softmax(Y), tf.cast(Y_placeholder, tf.float32))
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=Y,
                                 labels=tf.cast(Y_placeholder, tf.float32),name='softmax_cross_entropy'))
-        
+        loss_op = tf.summary.scalar('loss',loss)
         #loss = loss_supervised(logits, labels_placeholder)
         train_op, global_step = training(loss, FLAGS.supervised_learning_rate)
         accu = multiClassEvaluation(Y, Y_placeholder)
+        correct =tf.equal(tf.argmax(Y,1),tf.argmax(Y_placeholder,1))
+        error = 1 - tf.reduce_mean(tf.cast(correct, tf.float32))
+        error_op = tf.summary.scalar('error',error)
+        accu_op = tf.summary.scalar('accuracy',accu)
+    
 
-    #hist_summaries = [ae['biases{0}'.format(i + 1)]
-    #                  for i in xrange(ae.num_hidden_layers + 1)]
-    #hist_summaries.extend([ae['weights{0}'.format(i + 1)]
-    #                       for i in xrange(ae.num_hidden_layers + 1)])
-
-    #hist_summaries = [tf.histogram_summary(v.op.name + "_fine_tuning", v)
-    #                  for v in hist_summaries]
-    #summary_op = tf.merge_summary(hist_summaries)
-
-    #summary_writer = tf.train.SummaryWriter(pjoin(FLAGS.summary_dir,
-    #                                              'fine_tuning'),
-    #                                        graph_def=sess.graph_def,
-    #                                        flush_secs=FLAGS.flush_secs)
+        merged = tf.summary.merge([loss_op,error_op,accu_op,summary_op])
+        summary_writer = tf.summary.FileWriter(pjoin(FLAGS.summary_dir,
+                                                      'fold{0}/fine_tuning'.format(fold+1)),tf.get_default_graph())
+                                                #graph_def=sess.graph_def,
+                                                #flush_secs=FLAGS.flush_secs)
         vars_to_init = []
         for k in range(len(instNetList)):
             instNet = instNetList[k]
@@ -615,6 +631,7 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
         sess.run(tf.variables_initializer(vars_to_init))
         
     
+        train_loss  = tf.summary.scalar('train_loss',loss)
         #steps = FLAGS.finetuning_epochs * num_train
         for epochs in range(FLAGS.finetuning_epochs_epochs):
             perm = np.arange(num_train)
@@ -645,8 +662,15 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
                     #print('Step %d: loss = %.2f (%.3f sec)' % (count, loss_value, duration))
                     print('|   Epoch %d  |  Step %d  |  loss = %.3f | (%.3f sec)' % (epochs+1, step, loss_value, duration))
                     text_file.write('|   Epoch %d  |  Step %d  |  loss = %.3f | (%.3f sec)\n' % (epochs+1, step, loss_value, duration))
-                    # Update the events file.
                     
+                # Update the events file.
+                input_feed = np.transpose(batch_multi_X, (1,0,2))
+                target_feed = batch_multi_Y.astype(np.int32) 
+                train_loss_str = sess.run(train_loss,
+                                          feed_dict={input_pl: input_feed,Y_placeholder: target_feed
+                                                     })                                          
+                summary_writer.add_summary(train_loss_str, epochs)                    
+
             test_input_feed = np.transpose(test_multi_X, (1,0,2))
             test_target_feed = test_multi_Y.astype(np.int32) 
             bagAccu, Y_pred, inst_pred = sess.run([accu, tf.argmax(tf.nn.softmax(Y),axis=1), instOuts],
@@ -654,6 +678,9 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
             print('Epochs %d: accuracy = %.5f '  % (epochs+1, bagAccu)) 
             text_file.write('Epochs %d: accuracy = %.5f\n\n'  % (epochs+1, bagAccu))
             
+            result = sess.run(merged,feed_dict={input_pl: test_input_feed,Y_placeholder: test_target_feed})
+            i = epochs * num_train/FLAGS.finetune_batch_size +step
+            summary_writer.add_summary(result,i)
             #baseline = 1-len(test_Y.nonzero())/len(test_Y)
             #if bagAccu > baseline:
             calculateAccu(Y_pred,inst_pred,test_multi_Y,test_multi_label,FLAGS)
@@ -675,29 +702,6 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
                     #)
                     #summary_writer.add_summary(summary_img_str)
                     
-                #if (step + 1) % 1000 == 0 or (step + 1) == steps:
-                #    rain_sum = do_eval_summary("training_error",
-                #                        sess,
-                #                        eval_correct,
-                #                        input_pl,
-                #                        labels_placeholder,
-                #                        data.train)
-                #    val_sum = do_eval_summary("validation_error",
-                #                      sess,
-                #                      eval_correct,
-                #                      input_pl,
-                #                      labels_placeholder,
-                #                      data.validation)
-                #    test_sum = do_eval_summary("test_error",
-                #                       sess,
-                #                       eval_correct,
-                #                       input_pl,
-                #                       labels_placeholder,
-                #                       data.test)
-    
-                #    summary_writer.add_summary(train_sum, step)
-                #    summary_writer.add_summary(val_sum, step)
-                #    summary_writer.add_summary(test_sum, step)
 #            for b in range(instNet.num_hidden_layers + 1):
 #                if sess.run(tf.is_variable_initialized(instNet._b(b+1))):
 #                    #print("%s with value in [pretrain %s]\n %s" % (ae._b(b+1).name, n, ae._b(b+1).eval(sess)))
@@ -720,8 +724,7 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
         filename = _confusion_dir + '/Fold{0}_Epoch{1}_test_final.csv'.format(fold,epochs)
         ConfusionMatrix(Y_pred,test_multi_Y,FLAGS,filename)        
  
-        writer = tf.summary.FileWriter('logs/fine-tuning',tf.get_default_graph())
-        writer.close()           
+        summary_writer.close()           
 
 def ConfusionMatrix(logits,labels,FLAGS,filename):
     C = np.zeros((len(FLAGS.tacticName),len(FLAGS.tacticName)))
@@ -744,8 +747,7 @@ def ConfusionMatrix(logits,labels,FLAGS,filename):
     df = pd.DataFrame(CM)
     df.round(3)
     df.to_csv(filename)    
-        
-        
+             
 _confusion_dir = 'confusionMatrix'
 if not os.path.exists(_confusion_dir):
-    os.mkdir(_confusion_dir)      
+    os.mkdir(_confusion_dir)   
