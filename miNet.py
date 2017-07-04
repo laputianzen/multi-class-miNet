@@ -622,7 +622,9 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
         error_op = tf.summary.scalar('error',error)
         accu_op = tf.summary.scalar('accuracy',accu)
 
-        merged = tf.summary.merge([loss_op,error_op,accu_op,summary_op])
+        output_op = tf.summary.histogram('tactic_logits',Y)
+        label_op = tf.summary.histogram('tactic_labels',Y_placeholder)
+        merged = tf.summary.merge([loss_op,error_op,accu_op,summary_op,output_op,label_op])
         summary_writer = tf.summary.FileWriter(pjoin(FLAGS.summary_dir,
                                                       'fold{0}/fine_tuning'.format(fold+1)),tf.get_default_graph())
                                                 #graph_def=sess.graph_def,
