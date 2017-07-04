@@ -17,7 +17,7 @@ import miNet
 
 def main():
     FLAGS = lambda: None
-    FLAGS.pretrain_batch_size = None;
+    FLAGS.pretrain_batch_size = 2;
     FLAGS.finetune_batch_size = None;
     FLAGS.pre_layer_learning_rate = [0.001,0.001]#GD[0.01,0.01]
     FLAGS.pretraining_epochs = 2000
