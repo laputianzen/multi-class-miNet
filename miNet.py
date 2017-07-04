@@ -373,10 +373,10 @@ def main_unsupervised(ae_shape,fold,FLAGS):
             
             with tf.variable_scope("pretrain_{0}_mi{1}".format(n,k+1)):
                 input_ = tf.placeholder(dtype=tf.float32,
-                                        shape=(FLAGS.pretrain_batch_size, ae_shape[k][0]),
+                                        shape=(None, ae_shape[k][0]),
                                         name='ae_input_pl')
                 target_ = tf.placeholder(dtype=tf.float32,
-                                         shape=(FLAGS.pretrain_batch_size, ae_shape[k][0]),
+                                         shape=(None, ae_shape[k][0]),
                                          name='ae_target_pl')
                 layer = aeList[k].pretrain_net(input_, n)
 
@@ -408,9 +408,9 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                 optim_vars = [var for var in tf.global_variables() if ('beta' in var.name or 'Adam' in var.name)]
 #                for var in adam_vars:
 #                    vars_to_init.append(var)
+                            
+                pretrain_test_loss  = tf.summary.scalar('pretrain_test_loss',loss)
                 
-            
-                    
                 saver = tf.train.Saver(vars_to_init)
                 model_ckpt = _pretrain_model_dir+ 'model.ckpt'    
             
@@ -427,6 +427,8 @@ def main_unsupervised(ae_shape,fold,FLAGS):
 #                        text_file.write("%s with value in [pretrain %s]\n %s\n" % (ae._b(b+1).name, n, ae._b(b+1).eval(sess)))
 #                text_file.close()                    
                 else:
+                    if FLAGS.pretrain_batch_size is None:
+                        FLAGS.pretrain_batch_size = batch_X.shape[0]
                     sess.run(tf.variables_initializer(vars_to_init))
                     sess.run(tf.variables_initializer(optim_vars))
                     print("\n\n")
@@ -476,6 +478,20 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                                             .format(count, loss_value, n, epochs + 1)
         
                                     print(output)
+                        test_input_feed = np.reshape(test_X,(test_X.shape[0]*test_X.shape[1],test_X.shape[2]))
+                        test_target_feed = np.reshape(test_X,(test_X.shape[0]*test_X.shape[1],test_X.shape[2]))
+                        #test_target_feed = test_Y.astype(np.int32)     
+                        loss_summary, loss_value = sess.run([train_op, loss],
+                                                            feed_dict={
+                                                                    input_: test_input_feed,
+                                                                    target_: test_target_feed
+                                                                    })
+    
+                        pretrain_test_loss_str = sess.run(pretrain_test_loss,
+                                                  feed_dict={input_: test_input_feed,target_: test_target_feed
+                                                     })                                          
+                        summary_writer.add_summary(pretrain_test_loss_str, epochs)
+                        print ('epoch %d: test loss = %.3f' %(epochs,loss_value))                           
                     summary_writer.close()         
 #                text_file = open("Output.txt", "a")
 #                for b in range(len(ae_shape) - 2):

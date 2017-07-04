@@ -17,12 +17,12 @@ import miNet
 
 def main():
     FLAGS = lambda: None
-    FLAGS.pretrain_batch_size = 2;
-    FLAGS.finetune_batch_size = 2;
+    FLAGS.pretrain_batch_size = None;
+    FLAGS.finetune_batch_size = None;
     FLAGS.pre_layer_learning_rate = [0.001,0.001]#GD[0.01,0.01]
     FLAGS.pretraining_epochs = 2000
     FLAGS.supervised_learning_rate = 0.001#GD 0.5
-    FLAGS.finetuning_epochs_epochs = 50
+    FLAGS.finetuning_epochs_epochs = 200
     FLAGS.summary_dir = 'summaries'
     FLAGS.flush_secs  = 120
     FLAGS.optim_method = tf.train.AdamOptimizer
