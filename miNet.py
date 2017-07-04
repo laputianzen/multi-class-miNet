@@ -145,11 +145,9 @@ class miNet(object):
         return vars_to_init
     
     @staticmethod
-    def _activate(x, w, b, transpose_w=False, acfun=""):
-        if acfun is "sigmoid":
-            y = tf.sigmoid(tf.nn.bias_add(tf.matmul(x, w, transpose_b=transpose_w), b))
-        elif acfun is "relu":
-            y = tf.nn.relu(tf.nn.bias_add(tf.matmul(x, w, transpose_b=transpose_w), b))
+    def _activate(x, w, b, transpose_w=False, acfun=None):
+        if acfun is not None:
+            y = acfun(tf.nn.bias_add(tf.matmul(x, w, transpose_b=transpose_w), b))
         else:
             y = tf.nn.bias_add(tf.matmul(x, w, transpose_b=transpose_w), b)
             
@@ -172,9 +170,9 @@ class miNet(object):
         last_output = input_pl
         for i in range(n - 1):
             if i == self.__num_hidden_layers+1:
-                acfun = "sigmoid"
+                acfun = tf.sigmoid
             else:
-                acfun = "relu"
+                acfun = tf.nn.relu
             #acfun = "sigmoid"
             w = self._w(i + 1, "_fixed")
             b = self._b(i + 1, "_fixed")
@@ -185,9 +183,9 @@ class miNet(object):
             return last_output
         
         if n == self.__num_hidden_layers+1:
-            acfun = "sigmoid"
+            acfun = tf.sigmoid
         else:
-            acfun = "relu"        
+            acfun = tf.nn.relu       
         last_output = self._activate(last_output, self._w(n), self._b(n), acfun=acfun)
         
         out = self._activate(last_output, self._w(n), self._b(n, "_out"),
@@ -208,9 +206,9 @@ class miNet(object):
         
         for i in range(self.__num_hidden_layers + 1):
             if i+1 == self.__num_hidden_layers+1:
-                acfun = "sigmoid"
+                acfun = tf.sigmoid
             else:
-                acfun = "relu"
+                acfun = tf.nn.relu
             #acfun = "sigmoid" acfun = "relu"            
             # Fine tuning will be done on these variables
             w = self._w(i + 1)
@@ -440,28 +438,30 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                         np.random.shuffle(perm)
                         for step in range(int(num_train/FLAGS.pretrain_batch_size)):
                             selectIndex = perm[FLAGS.pretrain_batch_size*step:FLAGS.pretrain_batch_size*step+FLAGS.pretrain_batch_size]
-                            for I in range(len(batch_X[0])):
+                            #for I in range(len(batch_X[0])):
                             #input_feed = batch_X[perm[2*step:2*step+2],i,:]
                             ##target_feed = batch_Y[2*step:2*step+2,1]
                             #target_feed = batch_X[perm[2*step:2*step+2],i,:]
                             #feed_dict = {input_: input_feed,target_: target_feed}
                             #feed_dict = fill_feed_dict_ae(data.train, input_, target_, noise[i])
-                                input_feed = batch_X[selectIndex,I,:]
-                                target_feed = batch_X[selectIndex,I,:]
-                                loss_summary, loss_value = sess.run([train_op, loss],
-                                                                feed_dict={
-                                                                    input_: input_feed,
-                                                                    target_: target_feed
-                                                                    })
+                            input_feed = np.reshape(batch_X[selectIndex,:,:],
+                                                    (batch_X[selectIndex,:,:].shape[0]*batch_X[selectIndex,:,:].shape[1],batch_X[selectIndex,:,:].shape[2]))
+                            target_feed = input_feed
+                            loss_summary, loss_value = sess.run([train_op, loss],
+                                                            feed_dict={
+                                                                input_: input_feed,
+                                                                target_: target_feed
+                                                                })
 
-                                count = epochs*num_train*len(batch_X[0])+step*len(batch_X[0])*len(input_feed)+(I+1)*len(input_feed)
-                            #if count % 100 == 0:
-                                if count % (10*len(input_feed)*len(batch_X[0])) == 0:
-                                    summary_str = sess.run(summary_op, feed_dict={
-                                                                    input_: input_feed,
-                                                                    target_: target_feed
-                                                                    })
-                                    summary_writer.add_summary(summary_str, count)
+#                                count = epochs*num_train*len(batch_X[0])+step*len(batch_X[0])*len(input_feed)+(I+1)*len(input_feed)
+#                            #if count % 100 == 0:
+#                                if count % (10*len(input_feed)*len(batch_X[0])) == 0:
+                            if step % 2 ==0:
+                                summary_str = sess.run(summary_op, feed_dict={
+                                                                input_: input_feed,
+                                                                target_: target_feed
+                                                                })
+                                summary_writer.add_summary(summary_str, step)
                         #image_summary_op = \
                         #tf.image_summary("training_images",
                         #                 tf.reshape(input_,
@@ -474,10 +474,10 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                         #                       feed_dict=feed_dict)
                         #summary_writer.add_summary(summary_img_str)
         
-                                    output = "| {0:>13} | {1:13.4f} | Layer {2} | Epoch {3}  |"\
-                                            .format(count, loss_value, n, epochs + 1)
-        
-                                    print(output)
+                                output = "| {0:>13} | {1:13.4f} | Layer {2} | Epoch {3}  |"\
+                                        .format(step, loss_value, n, epochs + 1)
+    
+                                print(output)
                         test_input_feed = np.reshape(test_X,(test_X.shape[0]*test_X.shape[1],test_X.shape[2]))
                         test_target_feed = np.reshape(test_X,(test_X.shape[0]*test_X.shape[1],test_X.shape[2]))
                         #test_target_feed = test_Y.astype(np.int32)     
