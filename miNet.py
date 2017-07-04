@@ -264,7 +264,7 @@ class miNet(object):
 
 loss_summaries = {}
 
-def training(loss, learning_rate, loss_key=None):
+def training(loss, learning_rate, loss_key=None, optimMethod=tf.train.AdamOptimizer):
   """Sets up the training Ops.
 
   Creates a summarizer to track the loss over time in TensorBoard.
@@ -291,9 +291,9 @@ def training(loss, learning_rate, loss_key=None):
     for var in tf.trainable_variables():
       tf.summary.histogram(var.op.name, var)
   # Create the gradient descent optimizer with the given learning rate.
-  optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+  #optimizer = tf.train.GradientDescentOptimizer(learning_rate)
   #optimizer = tf.train.AdamOptimizer(learning_rate)
-  #optimizer = tf.train.AdamOptimizer(learning_rate)
+  optimizer = optimMethod(learning_rate)
   # Create a variable to track the global step.
   global_step = tf.Variable(0, name='global_step', trainable=False)
   # Use the optimizer to apply the gradients that minimize the loss
@@ -388,7 +388,7 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                 else:
                     loss = tf.sqrt(tf.nn.l2_loss(tf.subtract(layer, target_for_loss)))
                         
-                train_op, global_step = training(loss, learning_rates[i], i)
+                train_op, global_step = training(loss, learning_rates[i], i, optimMethod=FLAGS.optim_method)
     
                 summary_dir = pjoin(FLAGS.summary_dir, 'fold{0}/mi{1}/pretraining_{2}'.format(fold+1,k+1,n))
                 summary_writer = tf.summary.FileWriter(summary_dir,
@@ -403,6 +403,12 @@ def main_unsupervised(ae_shape,fold,FLAGS):
 
                 vars_to_init = aeList[k].get_variables_to_init(n)
                 vars_to_init.append(global_step)
+                
+                # adam special parameter beta1, beta2
+                optim_vars = [var for var in tf.global_variables() if ('beta' in var.name or 'Adam' in var.name)]
+#                for var in adam_vars:
+#                    vars_to_init.append(var)
+                
             
                     
                 saver = tf.train.Saver(vars_to_init)
@@ -421,8 +427,8 @@ def main_unsupervised(ae_shape,fold,FLAGS):
 #                        text_file.write("%s with value in [pretrain %s]\n %s\n" % (ae._b(b+1).name, n, ae._b(b+1).eval(sess)))
 #                text_file.close()                    
                 else:
-
                     sess.run(tf.variables_initializer(vars_to_init))
+                    sess.run(tf.variables_initializer(optim_vars))
                     print("\n\n")
                     print("| Training Step | Cross Entropy |  Layer  |   Epoch  |")
                     print("|---------------|---------------|---------|----------|")
@@ -609,13 +615,12 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
                                 labels=tf.cast(Y_placeholder, tf.float32),name='softmax_cross_entropy'))
         loss_op = tf.summary.scalar('loss',loss)
         #loss = loss_supervised(logits, labels_placeholder)
-        train_op, global_step = training(loss, FLAGS.supervised_learning_rate)
+        train_op, global_step = training(loss, FLAGS.supervised_learning_rate, None, optimMethod=FLAGS.optim_method)
         accu = multiClassEvaluation(Y, Y_placeholder)
         correct =tf.equal(tf.argmax(Y,1),tf.argmax(Y_placeholder,1))
         error = 1 - tf.reduce_mean(tf.cast(correct, tf.float32))
         error_op = tf.summary.scalar('error',error)
         accu_op = tf.summary.scalar('accuracy',accu)
-    
 
         merged = tf.summary.merge([loss_op,error_op,accu_op,summary_op])
         summary_writer = tf.summary.FileWriter(pjoin(FLAGS.summary_dir,
@@ -628,8 +633,11 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
             vars_to_init.extend(instNet.get_variables_to_init(instNet.num_hidden_layers + 1))
         
         vars_to_init.append(global_step)
-        sess.run(tf.variables_initializer(vars_to_init))
+        # adam special parameter beta1, beta2
+        optim_vars = [var for var in tf.global_variables() if ('beta' in var.name or 'Adam' in var.name)] 
         
+        sess.run(tf.variables_initializer(vars_to_init))
+        sess.run(tf.variables_initializer(optim_vars))
     
         train_loss  = tf.summary.scalar('train_loss',loss)
         #steps = FLAGS.finetuning_epochs * num_train
