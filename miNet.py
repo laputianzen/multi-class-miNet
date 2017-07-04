@@ -433,6 +433,7 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                     print("| Training Step | Cross Entropy |  Layer  |   Epoch  |")
                     print("|---------------|---------------|---------|----------|")
         
+                    count = 0
                     for epochs in range(FLAGS.pretraining_epochs):
                         perm = np.arange(num_train)
                         np.random.shuffle(perm)
@@ -453,10 +454,10 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                                                                 target_: target_feed
                                                                 })
 
-#                                count = epochs*num_train*len(batch_X[0])+step*len(batch_X[0])*len(input_feed)+(I+1)*len(input_feed)
+                            count = count + 1
 #                            #if count % 100 == 0:
 #                                if count % (10*len(input_feed)*len(batch_X[0])) == 0:
-                            if step % 2 ==0:
+                            if (count-1)*FLAGS.pretrain_batch_size*batch_X.shape[1] % (10*batch_X.shape[1]) ==0:
                                 summary_str = sess.run(summary_op, feed_dict={
                                                                 input_: input_feed,
                                                                 target_: target_feed
