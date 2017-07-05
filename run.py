@@ -13,7 +13,6 @@ import numpy as np
 
 import miNet
 
-#FLAGS = {}
 
 def main():
     FLAGS = lambda: None
@@ -26,14 +25,17 @@ def main():
         FLAGS.pre_layer_learning_rate = [0.01,0.01]#GD[0.01,0.01]
         FLAGS.supervised_learning_rate = 0.5#GD 0.5
         FLAGS.optim_method = tf.train.GradientDescentOptimizer
-        FLAGS.summary_dir = 'summaries/GradientDescent'
+        FLAGS.exp_dir = 'experiment/GradientDescent'
     elif optimizer == '1':
         FLAGS.supervised_learning_rate = 0.001#GD 0.5
         FLAGS.pre_layer_learning_rate = [0.001,0.001]#GD[0.01,0.01]
         FLAGS.optim_method = tf.train.AdamOptimizer
-        FLAGS.summary_dir = 'summaries/Adam'
+        FLAGS.exp_dir = 'experiment/Adam'
     
     FLAGS.flush_secs  = 120
+    FLAGS.summary_dir = FLAGS.exp_dir + '/summaries'
+    FLAGS._ckpt_dir   = FLAGS.exp_dir + '/modelAe'
+    FLAGS._confusion_dir = FLAGS.exp_dir + '/confusionMatrix'
     
     FLAGS.tacticName =['F23','EV','HK','PD','PT','RB','SP','WS','WV','WW']
     #tacticNumKP=[3,3,3,3,5,3,2,3,5,2]

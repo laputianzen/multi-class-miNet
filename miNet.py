@@ -320,9 +320,6 @@ def loss_x_entropy(output, target):
         return -1 * tf.reduce_mean(tf.reduce_sum(cross_entropy, 1),
                                    name='xentropy_mean')
 
-_chkpt_dir = 'modelAe'
-if not os.path.exists(_chkpt_dir):
-    os.mkdir(_chkpt_dir)
 
 def main_unsupervised(ae_shape,fold,FLAGS):
     tf.reset_default_graph()
@@ -365,7 +362,7 @@ def main_unsupervised(ae_shape,fold,FLAGS):
         print("\nae_shape has %s pretarined layer" %(len(ae_shape[k])-2))
         for i in range(len(ae_shape[k]) - 2):
             n = i + 1
-            _pretrain_model_dir = '{0}/{1}/C5{2}/pretrain{3}/'.format(_chkpt_dir,fold+1,FLAGS.k[k],n)
+            _pretrain_model_dir = '{0}/{1}/C5{2}/pretrain{3}/'.format(FLAGS._ckpt_dir,fold+1,FLAGS.k[k],n)
             if not os.path.exists(_pretrain_model_dir):
                 os.makedirs(_pretrain_model_dir)
             
@@ -548,6 +545,8 @@ def calculateAccu(Y_pred,inst_pred,test_Y,test_label,FLAGS):
 text_file = open("final_result.txt", "w")
 
 def main_supervised(instNetList,num_inst,fold,FLAGS):
+    if not os.path.exists(FLAGS._confusion_dir):
+        os.mkdir(FLAGS._confusion_dir)
     with instNetList[0].session.graph.as_default():
         sess = instNetList[0].session
         
@@ -712,7 +711,7 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
             #if bagAccu > baseline:
             calculateAccu(Y_pred,inst_pred,test_multi_Y,test_multi_label,FLAGS)
             
-            filename = _confusion_dir + '/Fold{0}_Epoch{1}_test.csv'.format(fold,epochs)
+            filename = FLAGS._confusion_dir + '/Fold{0}_Epoch{1}_test.csv'.format(fold,epochs)
             ConfusionMatrix(Y_pred,test_multi_Y,FLAGS,filename)
             #print("")
 
@@ -748,7 +747,8 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
         print('\nAfter %d Epochs: accuracy = %.5f'  % (epochs+1, bagAccu))
         calculateAccu(Y_pred,inst_pred,test_multi_Y,test_multi_label,FLAGS)
         time.sleep(0.5)
-        filename = _confusion_dir + '/Fold{0}_Epoch{1}_test_final.csv'.format(fold,epochs)
+           
+        filename = FLAGS._confusion_dir + '/Fold{0}_Epoch{1}_test_final.csv'.format(fold,epochs)
         ConfusionMatrix(Y_pred,test_multi_Y,FLAGS,filename)        
  
         summary_writer.close()           
@@ -774,7 +774,3 @@ def ConfusionMatrix(logits,labels,FLAGS,filename):
     df = pd.DataFrame(CM)
     df.round(3)
     df.to_csv(filename)    
-             
-_confusion_dir = 'confusionMatrix'
-if not os.path.exists(_confusion_dir):
-    os.mkdir(_confusion_dir)   
