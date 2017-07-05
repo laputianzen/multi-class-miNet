@@ -462,7 +462,7 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                                                                 input_: input_feed,
                                                                 target_: target_feed
                                                                 })
-                                summary_writer.add_summary(summary_str, step)
+                                summary_writer.add_summary(summary_str, count)
                         #image_summary_op = \
                         #tf.image_summary("training_images",
                         #                 tf.reshape(input_,
