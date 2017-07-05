@@ -19,18 +19,20 @@ def main():
     FLAGS.pretrain_batch_size = 2
     FLAGS.finetune_batch_size = None
     FLAGS.finetuning_epochs_epochs = 200
-    FLAGS.pretraining_epochs = 2000
+    FLAGS.pretraining_epochs = 20000
     optimizer = input('Select Optimizer [0:GradientDescent, 1:Adam]:')
     if optimizer == '0':
-        FLAGS.pre_layer_learning_rate = [0.01,0.01]#GD[0.01,0.01]
+        FLAGS.pre_layer_learning_rate = (0.01,0.01)#GD[0.01,0.01]
         FLAGS.supervised_learning_rate = 0.5#GD 0.5
         FLAGS.optim_method = tf.train.GradientDescentOptimizer
-        FLAGS.exp_dir = 'experiment/GradientDescent'
+        FLAGS.exp_dir = 'experiment/GradientDescent/pretrain={0}_finetune={1}'.format(
+                FLAGS.pre_layer_learning_rate,FLAGS.supervised_learning_rate)
     elif optimizer == '1':
         FLAGS.supervised_learning_rate = 0.001#GD 0.5
-        FLAGS.pre_layer_learning_rate = [0.001,0.001]#GD[0.01,0.01]
+        FLAGS.pre_layer_learning_rate = (0.001,0.001)#GD[0.01,0.01]
         FLAGS.optim_method = tf.train.AdamOptimizer
-        FLAGS.exp_dir = 'experiment/Adam'
+        FLAGS.exp_dir = 'experiment/Adam/pretrain={0}_finetune={1}'.format(
+                FLAGS.pre_layer_learning_rate,FLAGS.supervised_learning_rate)
     
     FLAGS.flush_secs  = 120
     FLAGS.summary_dir = FLAGS.exp_dir + '/summaries'
