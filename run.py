@@ -17,16 +17,24 @@ import miNet
 
 def main():
     FLAGS = lambda: None
-    FLAGS.pretrain_batch_size = 2;
-    FLAGS.finetune_batch_size = None;
-    FLAGS.pre_layer_learning_rate = [0.001,0.001]#GD[0.01,0.01]
-    FLAGS.pretraining_epochs = 2000
-    FLAGS.supervised_learning_rate = 0.001#GD 0.5
+    FLAGS.pretrain_batch_size = 2
+    FLAGS.finetune_batch_size = None
     FLAGS.finetuning_epochs_epochs = 200
-    FLAGS.summary_dir = 'summaries'
+    FLAGS.pretraining_epochs = 2000
+    optimizer = input('Select Optimizer [0:GradientDescent, 1:Adam]:')
+    if optimizer == '0':
+        FLAGS.pre_layer_learning_rate = [0.01,0.01]#GD[0.01,0.01]
+        FLAGS.supervised_learning_rate = 0.5#GD 0.5
+        FLAGS.optim_method = tf.train.GradientDescentOptimizer
+        FLAGS.summary_dir = 'summaries/GradientDescent'
+    elif optimizer == '1':
+        FLAGS.supervised_learning_rate = 0.001#GD 0.5
+        FLAGS.pre_layer_learning_rate = [0.001,0.001]#GD[0.01,0.01]
+        FLAGS.optim_method = tf.train.AdamOptimizer
+        FLAGS.summary_dir = 'summaries/Adam'
+    
     FLAGS.flush_secs  = 120
-    FLAGS.optim_method = tf.train.AdamOptimizer
-
+    
     FLAGS.tacticName =['F23','EV','HK','PD','PT','RB','SP','WS','WV','WW']
     #tacticNumKP=[3,3,3,3,5,3,2,3,5,2]
     #NUM_CLASS = len(tacticName)
