@@ -385,16 +385,7 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                         
                 train_op, global_step = training(loss, learning_rates[i], i, optimMethod=FLAGS.optim_method)
     
-                summary_dir = pjoin(FLAGS.summary_dir, 'fold{0}/mi{1}/pretraining_{2}'.format(fold+1,k+1,n))
-                summary_writer = tf.summary.FileWriter(summary_dir,
-                                                        graph_def=sess.graph_def,
-                                                        flush_secs=FLAGS.flush_secs)
-                summary_vars = [aeList[k]["biases{0}".format(n)], aeList[k]["weights{0}".format(n)]]
-    
-                hist_summarries = [tf.summary.histogram(v.op.name, v)
-                               for v in summary_vars]
-                hist_summarries.append(loss_summaries[i])
-                summary_op = tf.summary.merge(hist_summarries)
+
 
                 vars_to_init = aeList[k].get_variables_to_init(n)
                 vars_to_init.append(global_step)
@@ -403,7 +394,7 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                 optim_vars = [var for var in tf.global_variables() if ('beta' in var.name or 'Adam' in var.name)]
 #                for var in adam_vars:
 #                    vars_to_init.append(var)
-                            
+                        
                 pretrain_test_loss  = tf.summary.scalar('pretrain_test_loss',loss)
                 
                 saver = tf.train.Saver(vars_to_init)
@@ -422,6 +413,17 @@ def main_unsupervised(ae_shape,fold,FLAGS):
 #                        text_file.write("%s with value in [pretrain %s]\n %s\n" % (ae._b(b+1).name, n, ae._b(b+1).eval(sess)))
 #                text_file.close()                    
                 else:
+                    summary_dir = pjoin(FLAGS.summary_dir, 'fold{0}/mi{1}/pretraining_{2}'.format(fold+1,k+1,n))
+                    summary_writer = tf.summary.FileWriter(summary_dir,
+                                                           graph_def=sess.graph_def,
+                                                           flush_secs=FLAGS.flush_secs)
+                    summary_vars = [aeList[k]["biases{0}".format(n)], aeList[k]["weights{0}".format(n)]]
+    
+                    hist_summarries = [tf.summary.histogram(v.op.name, v)
+                                   for v in summary_vars]
+                    hist_summarries.append(loss_summaries[i])
+                    summary_op = tf.summary.merge(hist_summarries)                    
+                    
                     if FLAGS.pretrain_batch_size is None:
                         FLAGS.pretrain_batch_size = batch_X.shape[0]
                     sess.run(tf.variables_initializer(vars_to_init))
