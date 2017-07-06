@@ -522,7 +522,9 @@ def multiClassEvaluation(logits, labels):
         that were predicted correctly.
         """    
     correct_prediction = tf.equal(tf.argmax(logits,1), tf.argmax(labels,1))
-    return tf.reduce_mean(tf.cast(correct_prediction, tf.float32))    
+    accu  = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    error = 1 - accu
+    return accu, error
 
 def calculateAccu(Y_pred,inst_pred,test_Y,test_label,FLAGS):
           
@@ -586,8 +588,9 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
                                                 instNetList[0].shape[0]),name='input_pl')
 
         hist_summaries = []
-        for k in range(len(instNetList)):            
-            out_Y, out_y = instNetList[k].MIL(input_pl[instIdx[k]:instIdx[k+1]])
+        for k in range(len(instNetList)):
+            with tf.name_scope('C5{0}'.format(FLAGS.k[k])):            
+                out_Y, out_y = instNetList[k].MIL(input_pl[instIdx[k]:instIdx[k+1]])
             #bagOuts.append(tf.transpose(out_Y,perm=[1,0]))
             bagOuts.append(out_Y)
             instOuts.append(out_y)
@@ -602,7 +605,7 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
         summary_op = tf.summary.merge(hist_summaries)            
         
         #Y = tf.dynamic_stitch(FLAGS.C5k_CLASS,bagOuts)
-        Y = tf.concat(bagOuts,1)
+        Y = tf.concat(bagOuts,1,name='output')
 #        saver = tf.train.Saver()
 #        if new:
         print("")
@@ -630,16 +633,21 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
                                         name='target_pl')
         
         #loss = loss_x_entropy(tf.nn.softmax(Y), tf.cast(Y_placeholder, tf.float32))
-        loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=Y,
+        with tf.name_scope('softmax_cross_entory_with_logit'):
+            loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=Y,
                                 labels=tf.cast(Y_placeholder, tf.float32),name='softmax_cross_entropy'))
-        loss_op = tf.summary.scalar('loss',loss)
+        loss_op = tf.summary.scalar('test_loss',loss)
         #loss = loss_supervised(logits, labels_placeholder)
         train_op, global_step = training(loss, FLAGS.supervised_learning_rate, None, optimMethod=FLAGS.optim_method)
-        accu = multiClassEvaluation(Y, Y_placeholder)
-        correct =tf.equal(tf.argmax(Y,1),tf.argmax(Y_placeholder,1))
-        error = 1 - tf.reduce_mean(tf.cast(correct, tf.float32))
-        error_op = tf.summary.scalar('error',error)
-        accu_op = tf.summary.scalar('accuracy',accu)
+        with tf.name_scope('MultiClassEvaluation'):
+            accu, error = multiClassEvaluation(Y, Y_placeholder)
+        
+#        with tf.name_scope('correctness'):
+#            correct =tf.equal(tf.argmax(Y,1),tf.argmax(Y_placeholder,1))
+#            error = 1 - tf.reduce_mean(tf.cast(correct, tf.float32))
+        
+        error_op = tf.summary.scalar('test_error',error)
+        accu_op = tf.summary.scalar('test_accuracy',accu)
 
         output_op = tf.summary.histogram('tactic_logits',Y)
         label_op = tf.summary.histogram('tactic_labels',Y_placeholder)
