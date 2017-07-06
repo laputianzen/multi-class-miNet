@@ -649,9 +649,11 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
         error_op = tf.summary.scalar('test_error',error)
         accu_op = tf.summary.scalar('test_accuracy',accu)
 
-        output_op = tf.summary.histogram('tactic_logits',Y)
-        label_op = tf.summary.histogram('tactic_labels',Y_placeholder)
-        merged = tf.summary.merge([loss_op,error_op,accu_op,summary_op,output_op,label_op])
+        Y_labels_image = label2image(Y_placeholder)
+        #label_op = tf.summary.image('tactic_labels',Y_label_image)
+        Y_logits_image = label2image(Y)
+        #label_op = tf.summary.histogram('tactic_labels',Y_placeholder)
+        merged = tf.summary.merge([loss_op,error_op,accu_op,summary_op])#,output_op,label_op])
         summary_writer = tf.summary.FileWriter(pjoin(FLAGS.summary_dir,
                                                       'fold{0}/fine_tuning'.format(fold+1)),tf.get_default_graph())
                                                 #graph_def=sess.graph_def,
@@ -716,10 +718,23 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
             text_file.write('Epochs %d: accuracy = %.5f\n\n'  % (epochs+1, bagAccu))
             
             result = sess.run(merged,feed_dict={input_pl: test_input_feed,Y_placeholder: test_target_feed})
-            i = epochs * num_train/FLAGS.finetune_batch_size +step
-            summary_writer.add_summary(result,i)
+            #i = epochs * num_train/FLAGS.finetune_batch_size +step
+            summary_writer.add_summary(result,epochs)
             #baseline = 1-len(test_Y.nonzero())/len(test_Y)
             #if bagAccu > baseline:
+             
+            # image logit
+            if (epochs+1) % 40 == 0:
+                train_logits_str = GenerateSummaryStr('train_tactic_logits{0}'.format(epochs+1),tf.summary.image,
+                                        Y_logits_image,batch_multi_X,batch_multi_Y,sess,input_pl,Y_placeholder)
+                             
+                summary_writer.add_summary(train_logits_str)
+                test_logits_str = GenerateSummaryStr('test_tactic_logits{0}'.format(epochs+1),tf.summary.image,
+                                        Y_logits_image,test_multi_X,test_multi_Y,sess,input_pl,Y_placeholder)
+                             
+                summary_writer.add_summary(test_logits_str)           
+            
+            
             calculateAccu(Y_pred,inst_pred,test_multi_Y,test_multi_label,FLAGS)
             
             filename = FLAGS._confusion_dir + '/Fold{0}_Epoch{1}_test.csv'.format(fold,epochs)
@@ -749,6 +764,8 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
 #        else:
 #            saver = tf.train.import_meta_graph(model_ckpt+'.meta')
 #            saver.restore(sess, model_ckpt)                    
+        
+
            
         input_feed = np.transpose(test_multi_X, (1,0,2))
         target_feed = test_multi_Y.astype(np.int32) 
@@ -758,11 +775,37 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
         print('\nAfter %d Epochs: accuracy = %.5f'  % (epochs+1, bagAccu))
         calculateAccu(Y_pred,inst_pred,test_multi_Y,test_multi_label,FLAGS)
         time.sleep(0.5)
-           
+        
+        train_labels_str = GenerateSummaryStr('train_tactic_labels',tf.summary.image,
+                                        Y_labels_image,batch_multi_X,batch_multi_Y,sess,input_pl,Y_placeholder)
+                             
+        summary_writer.add_summary(train_labels_str)
+        test_labels_str = GenerateSummaryStr('test_tactic_labels',tf.summary.image,
+                                Y_labels_image,test_multi_X,test_multi_Y,sess,input_pl,Y_placeholder)
+                     
+        summary_writer.add_summary(test_labels_str)                  
+        
+        
         filename = FLAGS._confusion_dir + '/Fold{0}_Epoch{1}_test_final.csv'.format(fold,epochs)
         ConfusionMatrix(Y_pred,test_multi_Y,FLAGS,filename)        
  
         summary_writer.close()           
+
+def label2image(label_vec):
+    try: 
+        if len(label_vec.shape) == 2:
+            labelImage = tf.expand_dims(tf.expand_dims(label_vec,axis = 2),axis=0)
+            labelImage = tf.transpose(labelImage,perm=[0,2,1,3])
+            return labelImage
+    except:
+        print('label dim must be 2!')
+
+def GenerateSummaryStr(tag,summary_op,tf_op,input_data,label_data,sess,input_pl,target_pl):
+    input_feed = np.transpose(input_data, (1,0,2))
+    target_feed = label_data.astype(np.int32)
+    summary_str = sess.run(summary_op(tag,tf_op),
+                                    feed_dict={input_pl: input_feed,target_pl: target_feed})
+    return summary_str
 
 def ConfusionMatrix(logits,labels,FLAGS,filename):
     C = np.zeros((len(FLAGS.tacticName),len(FLAGS.tacticName)))
