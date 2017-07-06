@@ -628,14 +628,14 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
             FLAGS.finetune_batch_size = len(test_multi_Y)
             
         NUM_CLASS = len(FLAGS.tacticName)
-        Y_placeholder = tf.placeholder(tf.int32,
+        Y_placeholder = tf.placeholder(tf.float32,
                                         shape=(None,NUM_CLASS),
                                         name='target_pl')
         
         #loss = loss_x_entropy(tf.nn.softmax(Y), tf.cast(Y_placeholder, tf.float32))
         with tf.name_scope('softmax_cross_entory_with_logit'):
             loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=Y,
-                                labels=tf.cast(Y_placeholder, tf.float32),name='softmax_cross_entropy'))
+                                labels=Y_placeholder,name='softmax_cross_entropy'))
         loss_op = tf.summary.scalar('test_loss',loss)
         #loss = loss_supervised(logits, labels_placeholder)
         train_op, global_step = training(loss, FLAGS.supervised_learning_rate, None, optimMethod=FLAGS.optim_method)
