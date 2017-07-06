@@ -381,7 +381,8 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                 if n == aeList[k].num_hidden_layers+1:
                     loss = loss_x_entropy(layer, target_for_loss)
                 else:
-                    loss = tf.sqrt(tf.nn.l2_loss(tf.subtract(layer, target_for_loss)))
+                    #loss = tf.sqrt(tf.nn.l2_loss(tf.subtract(layer, target_for_loss)))
+                    loss  = tf.sqrt(tf.reduce_mean(tf.square(layer - target_for_loss)))
                         
                 train_op, global_step = training(loss, learning_rates[i], i, optimMethod=FLAGS.optim_method)
     
