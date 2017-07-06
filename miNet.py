@@ -145,13 +145,14 @@ class miNet(object):
         return vars_to_init
     
     @staticmethod
-    def _activate(x, w, b, transpose_w=False, acfun=None):
+    def _activate(x, w, b, transpose_w=False, acfun=None, keep_prob=1):
         if acfun is not None:
             y = acfun(tf.nn.bias_add(tf.matmul(x, w, transpose_b=transpose_w), b))
         else:
             y = tf.nn.bias_add(tf.matmul(x, w, transpose_b=transpose_w), b)
             
-        return y
+        dropout_out = tf.nn.dropout(y,keep_prob)        
+        return dropout_out
     
     def pretrain_net(self, input_pl, n, is_target=False):
         """Return net for step n training or target net
@@ -547,11 +548,13 @@ def calculateAccu(Y_pred,inst_pred,test_Y,test_label,FLAGS):
     time.sleep(1)
     return bagAccu, pAccu
 
-text_file = open("final_result.txt", "w")
+#text_file = open("final_result.txt", "w")
 
 def main_supervised(instNetList,num_inst,fold,FLAGS):
     if not os.path.exists(FLAGS._confusion_dir):
         os.mkdir(FLAGS._confusion_dir)
+        
+    text_file = open(FLAGS._result_txt,"w")
     with instNetList[0].session.graph.as_default():
         sess = instNetList[0].session
         
@@ -676,7 +679,7 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
             perm = np.arange(num_train)
             np.random.shuffle(perm)
             print("|-------------|-----------|-------------|----------|")
-            text_file.write("|-------------|-----------|-------------|----------|")
+            text_file.write("|-------------|-----------|-------------|----------|\n")
             for step in range(int(num_train/FLAGS.finetune_batch_size)):
                 start_time = time.time()
             
@@ -735,7 +738,8 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
                 summary_writer.add_summary(test_logits_str)           
             
             
-            calculateAccu(Y_pred,inst_pred,test_multi_Y,test_multi_label,FLAGS)
+            bagAccu,pAccu = calculateAccu(Y_pred,inst_pred,test_multi_Y,test_multi_label,FLAGS)
+            text_file.write('bag accuracy %.5f, inst accuracy %.5f\n' %(bagAccu, pAccu))
             
             filename = FLAGS._confusion_dir + '/Fold{0}_Epoch{1}_test.csv'.format(fold,epochs)
             ConfusionMatrix(Y_pred,test_multi_Y,FLAGS,filename)
