@@ -43,16 +43,20 @@ def main(optimizer,num_hidden_layer,fld=1):
     pretrain_shape = createPretrainShape(num_input,num_output,num_hidden_layer)
     print(pretrain_shape)
     #optimizer = input('Select Optimizer [0:GradientDescent, 1:Adam]:')
+    FLAGS.pre_layer_learning_rate = []
     if optimizer == '0':
         FLAGS.pretraining_epochs = 2000
-        FLAGS.pre_layer_learning_rate = [0.01,0.01]#GD[0.01,0.01]
+        
+        for h in range(num_hidden_layer+1):
+            FLAGS.pre_layer_learning_rate.extend([0.01])#GD[0.01,0.01]
         FLAGS.supervised_learning_rate = 0.5#GD 0.5
         FLAGS.optim_method = tf.train.GradientDescentOptimizer
         FLAGS.exp_dir = 'experiment/GradientDescent/numHiddenLayer{0}'.format(num_hidden_layer)
     elif optimizer == '1':
         FLAGS.pretraining_epochs = 600
         FLAGS.supervised_learning_rate = 0.001#GD 0.5
-        FLAGS.pre_layer_learning_rate = [0.001,0.001]#GD[0.01,0.01]
+        for h in range(num_hidden_layer+1):
+            FLAGS.pre_layer_learning_rate.extend([0.001])#GD[0.01,0.01]
         FLAGS.optim_method = tf.train.AdamOptimizer
         FLAGS.exp_dir = 'experiment//Adam/numHiddenLayer{0}'.format(num_hidden_layer)
     
@@ -60,6 +64,7 @@ def main(optimizer,num_hidden_layer,fld=1):
     FLAGS.summary_dir = FLAGS.exp_dir + '/summaries'
     FLAGS._ckpt_dir   = FLAGS.exp_dir + '/model'
     FLAGS._confusion_dir = FLAGS.exp_dir + '/confusionMatrix'
+    FLAGS._result_txt = FLAGS.exp_dir + '/final_result.txt'
     
     FLAGS.tacticName =['F23','EV','HK','PD','PT','RB','SP','WS','WV','WW']
     #tacticNumKP=[3,3,3,3,5,3,2,3,5,2]
