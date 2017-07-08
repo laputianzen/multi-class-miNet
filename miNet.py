@@ -154,7 +154,7 @@ class miNet(object):
         dropout_out = tf.nn.dropout(y,keep_prob)        
         return dropout_out
     
-    def pretrain_net(self, input_pl, n, is_target=False):
+    def pretrain_net(self, input_pl, n, dropout, is_target=False):
         """Return net for step n training or target net
         
         Args:
@@ -187,7 +187,7 @@ class miNet(object):
             acfun = tf.sigmoid
         else:
             acfun = tf.nn.relu       
-        last_output = self._activate(last_output, self._w(n), self._b(n), acfun=acfun)
+        last_output = self._activate(last_output, self._w(n), self._b(n), acfun=acfun, keep_prob=dropout)
         
         out = self._activate(last_output, self._w(n), self._b(n, "_out"),
                          transpose_w=True, acfun=acfun)
@@ -195,7 +195,7 @@ class miNet(object):
         out = tf.minimum(out, 1 - 1.e-9)
         return out
     
-    def single_instNet(self, input_pl):
+    def single_instNet(self, input_pl, dropout):
         """Get the supervised fine tuning net
 
         Args:
@@ -215,11 +215,11 @@ class miNet(object):
             w = self._w(i + 1)
             b = self._b(i + 1)
             
-            last_output = self._activate(last_output, w, b, acfun=acfun)
+            last_output = self._activate(last_output, w, b, acfun=acfun, keep_prob=dropout)
             
         return last_output
     
-    def MIL(self,input_plist):
+    def MIL(self,input_plist, dropout):
         #input_dim = self.shape[0]
         tmpList = list()
         for i in range(input_plist.shape[0]):
@@ -231,11 +231,11 @@ class miNet(object):
             with tf.variable_scope("mil") as scope:
                 if i == 0:
                 #if scope.reuse == False:
-                    self[name_instNet] = self.single_instNet(self[name_input])
+                    self[name_instNet] = self.single_instNet(self[name_input], dropout)
                     #scope.reuse = True
                     scope.reuse_variables()
                 else:    
-                    self[name_instNet] = self.single_instNet(self[name_input])
+                    self[name_instNet] = self.single_instNet(self[name_input], dropout)
             
             tmpList.append(self[name_instNet])
             #if not i == 0:
@@ -374,10 +374,12 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                 target_ = tf.placeholder(dtype=tf.float32,
                                          shape=(None, ae_shape[k][0]),
                                          name='ae_target_pl')
-                layer = aeList[k].pretrain_net(input_, n)
+                keep_prob_ = tf.placeholder(dtype=tf.float32,
+                                           name='dropout_ratio')
+                layer = aeList[k].pretrain_net(input_, n, keep_prob_)
 
                 with tf.name_scope("target"):
-                    target_for_loss = aeList[k].pretrain_net(target_, n, is_target=True)
+                    target_for_loss = aeList[k].pretrain_net(target_, n, keep_prob_, is_target=True)
                     
                 if n == aeList[k].num_hidden_layers+1:
                     loss = loss_x_entropy(layer, target_for_loss)
@@ -452,7 +454,8 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                             loss_summary, loss_value = sess.run([train_op, loss],
                                                             feed_dict={
                                                                 input_: input_feed,
-                                                                target_: target_feed
+                                                                target_: target_feed,
+                                                                keep_prob_: FLAGS.keep_prob
                                                                 })
 
                             count = count + 1
@@ -461,7 +464,8 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                             if (count-1)*FLAGS.pretrain_batch_size*batch_X.shape[1] % (10*batch_X.shape[1]) ==0:
                                 summary_str = sess.run(summary_op, feed_dict={
                                                                 input_: input_feed,
-                                                                target_: target_feed
+                                                                target_: target_feed,
+                                                                keep_prob_: 1.0
                                                                 })
                                 summary_writer.add_summary(summary_str, count)
                         #image_summary_op = \
@@ -486,11 +490,14 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                         loss_summary, loss_value = sess.run([train_op, loss],
                                                             feed_dict={
                                                                     input_: test_input_feed,
-                                                                    target_: test_target_feed
+                                                                    target_: test_target_feed,
+                                                                    keep_prob_: 1.0
                                                                     })
     
                         pretrain_test_loss_str = sess.run(pretrain_test_loss,
-                                                  feed_dict={input_: test_input_feed,target_: test_target_feed
+                                                  feed_dict={input_: test_input_feed,
+                                                             target_: test_target_feed,
+                                                             keep_prob_: 1.0
                                                      })                                          
                         summary_writer.add_summary(pretrain_test_loss_str, epochs)
                         print ('epoch %d: test loss = %.3f' %(epochs,loss_value))                           
@@ -589,11 +596,13 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
         instIdx = np.insert(np.cumsum(num_inst),0,0)
         input_pl = tf.placeholder(tf.float32, shape=(totalNumInst,None,
                                                 instNetList[0].shape[0]),name='input_pl')
+        keep_prob_ = tf.placeholder(dtype=tf.float32,
+                                           name='dropout_ratio')
 
         hist_summaries = []
         for k in range(len(instNetList)):
             with tf.name_scope('C5{0}'.format(FLAGS.k[k])):            
-                out_Y, out_y = instNetList[k].MIL(input_pl[instIdx[k]:instIdx[k+1]])
+                out_Y, out_y = instNetList[k].MIL(input_pl[instIdx[k]:instIdx[k+1]],keep_prob_)
             #bagOuts.append(tf.transpose(out_Y,perm=[1,0]))
             bagOuts.append(out_Y)
             instOuts.append(out_y)
@@ -691,7 +700,8 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
                 _, loss_value, logit, label = sess.run([train_op, loss, Y, Y_placeholder],
                                         feed_dict={
                                                 input_pl: input_feed,
-                                                Y_placeholder: target_feed
+                                                Y_placeholder: target_feed,
+                                                keep_prob_: FLAGS.keep_prob
                                         })
             
                 duration = time.time() - start_time
@@ -709,18 +719,26 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
                 input_feed = np.transpose(batch_multi_X, (1,0,2))
                 target_feed = batch_multi_Y.astype(np.int32) 
                 train_loss_str = sess.run(train_loss,
-                                          feed_dict={input_pl: input_feed,Y_placeholder: target_feed
+                                          feed_dict={input_pl: input_feed,
+                                                     Y_placeholder: target_feed,
+                                                     keep_prob_: 1.0
                                                      })                                          
                 summary_writer.add_summary(train_loss_str, epochs)                    
 
             test_input_feed = np.transpose(test_multi_X, (1,0,2))
             test_target_feed = test_multi_Y.astype(np.int32) 
             bagAccu, Y_pred, inst_pred = sess.run([accu, tf.argmax(tf.nn.softmax(Y),axis=1), instOuts],
-                                                   feed_dict={input_pl: test_input_feed,Y_placeholder: test_target_feed})
+                                                   feed_dict={input_pl: test_input_feed,
+                                                              Y_placeholder: test_target_feed,
+                                                              keep_prob_: 1.0
+                                                              })
             print('Epochs %d: accuracy = %.5f '  % (epochs+1, bagAccu)) 
             text_file.write('Epochs %d: accuracy = %.5f\n\n'  % (epochs+1, bagAccu))
             
-            result = sess.run(merged,feed_dict={input_pl: test_input_feed,Y_placeholder: test_target_feed})
+            result = sess.run(merged,feed_dict={input_pl: test_input_feed,
+                                                Y_placeholder: test_target_feed,
+                                                keep_prob_: 1.0
+                                                })
             #i = epochs * num_train/FLAGS.finetune_batch_size +step
             summary_writer.add_summary(result,epochs)
             #baseline = 1-len(test_Y.nonzero())/len(test_Y)
@@ -729,11 +747,11 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
             # image logit
             if (epochs+1) % 40 == 0:
                 train_logits_str = GenerateSummaryStr('train_tactic_logits{0}'.format(epochs+1),tf.summary.image,
-                                        Y_logits_image,batch_multi_X,batch_multi_Y,sess,input_pl,Y_placeholder)
+                                        Y_logits_image,batch_multi_X,batch_multi_Y,sess,input_pl,Y_placeholder,keep_prob_)
                              
                 summary_writer.add_summary(train_logits_str)
                 test_logits_str = GenerateSummaryStr('test_tactic_logits{0}'.format(epochs+1),tf.summary.image,
-                                        Y_logits_image,test_multi_X,test_multi_Y,sess,input_pl,Y_placeholder)
+                                        Y_logits_image,test_multi_X,test_multi_Y,sess,input_pl,Y_placeholder,keep_prob_)
                              
                 summary_writer.add_summary(test_logits_str)           
             
@@ -774,18 +792,20 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
         input_feed = np.transpose(test_multi_X, (1,0,2))
         target_feed = test_multi_Y.astype(np.int32) 
         bagAccu, Y_pred, inst_pred = sess.run([accu, tf.argmax(tf.nn.softmax(Y),axis=1), instOuts],
-                                               feed_dict={input_pl: test_input_feed,Y_placeholder: test_target_feed})
-        
+                                               feed_dict={input_pl: test_input_feed,
+                                                          Y_placeholder: test_target_feed,
+                                                          keep_prob_: 1.0
+                                                          })
         print('\nAfter %d Epochs: accuracy = %.5f'  % (epochs+1, bagAccu))
         calculateAccu(Y_pred,inst_pred,test_multi_Y,test_multi_label,FLAGS)
         time.sleep(0.5)
         
         train_labels_str = GenerateSummaryStr('train_tactic_labels',tf.summary.image,
-                                        Y_labels_image,batch_multi_X,batch_multi_Y,sess,input_pl,Y_placeholder)
+                                        Y_labels_image,batch_multi_X,batch_multi_Y,sess,input_pl,Y_placeholder,keep_prob_)
                              
         summary_writer.add_summary(train_labels_str)
         test_labels_str = GenerateSummaryStr('test_tactic_labels',tf.summary.image,
-                                Y_labels_image,test_multi_X,test_multi_Y,sess,input_pl,Y_placeholder)
+                                Y_labels_image,test_multi_X,test_multi_Y,sess,input_pl,Y_placeholder,keep_prob_)
                      
         summary_writer.add_summary(test_labels_str)                  
         
@@ -804,11 +824,14 @@ def label2image(label_vec):
     except:
         print('label dim must be 2!')
 
-def GenerateSummaryStr(tag,summary_op,tf_op,input_data,label_data,sess,input_pl,target_pl):
+def GenerateSummaryStr(tag,summary_op,tf_op,input_data,label_data,sess,input_pl,target_pl,keep_prob):
     input_feed = np.transpose(input_data, (1,0,2))
     target_feed = label_data.astype(np.int32)
     summary_str = sess.run(summary_op(tag,tf_op),
-                                    feed_dict={input_pl: input_feed,target_pl: target_feed})
+                                    feed_dict={input_pl: input_feed,
+                                               target_pl: target_feed,
+                                               keep_prob: 1.0
+                                               })
     return summary_str
 
 def ConfusionMatrix(logits,labels,FLAGS,filename):
