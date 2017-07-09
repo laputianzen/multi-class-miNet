@@ -531,7 +531,7 @@ def multiClassEvaluation(logits, labels):
         """    
     correct_prediction = tf.equal(tf.argmax(logits,1), tf.argmax(labels,1))
     accu  = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-    error = 1 - accu
+    error = tf.subtract(1.0,accu)
     return accu, error
 
 def calculateAccu(Y_pred,inst_pred,test_Y,test_label,FLAGS):
@@ -643,17 +643,16 @@ def main_supervised(instNetList,num_inst,fold,FLAGS):
         Y_placeholder = tf.placeholder(tf.float32,
                                         shape=(None,NUM_CLASS),
                                         name='target_pl')
-        
         #loss = loss_x_entropy(tf.nn.softmax(Y), tf.cast(Y_placeholder, tf.float32))
         with tf.name_scope('softmax_cross_entory_with_logit'):
-            loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=Y,
-                                labels=Y_placeholder,name='softmax_cross_entropy'))
+            loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=Y,
+                                labels=tf.argmax(Y_placeholder,axis=1),name='softmax_cross_entropy'))
         loss_op = tf.summary.scalar('test_loss',loss)
         #loss = loss_supervised(logits, labels_placeholder)
         train_op, global_step = training(loss, FLAGS.supervised_learning_rate, None, optimMethod=FLAGS.optim_method)
         with tf.name_scope('MultiClassEvaluation'):
             accu, error = multiClassEvaluation(Y, Y_placeholder)
-        
+        #train_op, global_step = training(error, FLAGS.supervised_learning_rate, None, optimMethod=FLAGS.optim_method)
 #        with tf.name_scope('correctness'):
 #            correct =tf.equal(tf.argmax(Y,1),tf.argmax(Y_placeholder,1))
 #            error = 1 - tf.reduce_mean(tf.cast(correct, tf.float32))
