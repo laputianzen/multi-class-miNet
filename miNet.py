@@ -208,6 +208,7 @@ class miNet(object):
         for i in range(self.__num_hidden_layers + 1):
             if i+1 == self.__num_hidden_layers+1:
                 acfun = tf.sigmoid
+                dropout = 1.0
             else:
                 acfun = tf.nn.relu
             #acfun = "sigmoid" acfun = "relu"            
