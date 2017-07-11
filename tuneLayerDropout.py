@@ -103,6 +103,8 @@ def main(optimizer,num_hidden_layer,dropout,fld=1):
 if __name__ == '__main__':
     optimizer = ['1']
     dropout = [0.5,0.8,1]
+    #dropout = [0.5]
     for numHL in range(3):
         for d in dropout:
-            main(optimizer[0],numHL+1,d)
+            for f in [1]:#,2,3,4,5]:
+                main(optimizer[0],numHL+1,d,f)
