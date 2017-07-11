@@ -146,13 +146,13 @@ class miNet(object):
     
     @staticmethod
     def _activate(x, w, b, transpose_w=False, acfun=None, keep_prob=1):
+        dropout_out = tf.nn.dropout(x,keep_prob)  
         if acfun is not None:
-            y = acfun(tf.nn.bias_add(tf.matmul(x, w, transpose_b=transpose_w), b))
+            y = acfun(tf.nn.bias_add(tf.matmul(dropout_out, w, transpose_b=transpose_w), b))
         else:
-            y = tf.nn.bias_add(tf.matmul(x, w, transpose_b=transpose_w), b)
-            
-        dropout_out = tf.nn.dropout(y,keep_prob)        
-        return dropout_out
+            y = tf.nn.bias_add(tf.matmul(dropout_out, w, transpose_b=transpose_w), b)
+                         
+        return y
     
     def pretrain_net(self, input_pl, n, is_target=False):
         """Return net for step n training or target net
