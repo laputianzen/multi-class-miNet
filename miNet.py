@@ -154,7 +154,7 @@ class miNet(object):
         dropout_out = tf.nn.dropout(y,keep_prob)        
         return dropout_out
     
-    def pretrain_net(self, input_pl, n, dropout, is_target=False):
+    def pretrain_net(self, input_pl, n, is_target=False):
         """Return net for step n training or target net
         
         Args:
@@ -187,7 +187,7 @@ class miNet(object):
             acfun = tf.sigmoid
         else:
             acfun = tf.nn.relu       
-        last_output = self._activate(last_output, self._w(n), self._b(n), acfun=acfun, keep_prob=dropout)
+        last_output = self._activate(last_output, self._w(n), self._b(n), acfun=acfun)
         
         out = self._activate(last_output, self._w(n), self._b(n, "_out"),
                          transpose_w=True, acfun=acfun)
@@ -375,12 +375,10 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                 target_ = tf.placeholder(dtype=tf.float32,
                                          shape=(None, ae_shape[k][0]),
                                          name='ae_target_pl')
-                keep_prob_ = tf.placeholder(dtype=tf.float32,
-                                           name='dropout_ratio')
-                layer = aeList[k].pretrain_net(input_, n, keep_prob_)
+                layer = aeList[k].pretrain_net(input_, n)
 
                 with tf.name_scope("target"):
-                    target_for_loss = aeList[k].pretrain_net(target_, n, keep_prob_, is_target=True)
+                    target_for_loss = aeList[k].pretrain_net(target_, n, is_target=True)
                     
                 if n == aeList[k].num_hidden_layers+1:
                     loss = loss_x_entropy(layer, target_for_loss)
@@ -456,7 +454,6 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                                                             feed_dict={
                                                                 input_: input_feed,
                                                                 target_: target_feed,
-                                                                keep_prob_: FLAGS.keep_prob
                                                                 })
 
                             count = count + 1
@@ -466,7 +463,6 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                                 summary_str = sess.run(summary_op, feed_dict={
                                                                 input_: input_feed,
                                                                 target_: target_feed,
-                                                                keep_prob_: 1.0
                                                                 })
                                 summary_writer.add_summary(summary_str, count)
                         #image_summary_op = \
@@ -492,13 +488,11 @@ def main_unsupervised(ae_shape,fold,FLAGS):
                                                             feed_dict={
                                                                     input_: test_input_feed,
                                                                     target_: test_target_feed,
-                                                                    keep_prob_: 1.0
                                                                     })
     
                         pretrain_test_loss_str = sess.run(pretrain_test_loss,
                                                   feed_dict={input_: test_input_feed,
                                                              target_: test_target_feed,
-                                                             keep_prob_: 1.0
                                                      })                                          
                         summary_writer.add_summary(pretrain_test_loss_str, epochs)
                         print ('epoch %d: test loss = %.3f' %(epochs,loss_value))                           
