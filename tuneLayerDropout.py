@@ -29,6 +29,7 @@ def main(optimizer,num_hidden_layer,dropout,fld=1):
     FLAGS.finetune_batch_size = None
     FLAGS.finetuning_epochs_epochs = 200
     FLAGS.keep_prob = dropout
+    FLAGS.batch_norm_phase = True
    
     if num_hidden_layer is None:
         num_hidden_layer = input('how many hidden layer?')
@@ -102,9 +103,9 @@ def main(optimizer,num_hidden_layer,dropout,fld=1):
 
 if __name__ == '__main__':
     optimizer = ['1']
-    dropout = [0.5,0.8,1]
+    dropout = [1]#[0.5,0.8,1]
     #dropout = [0.5]
-    for numHL in range(3):
+    for numHL in range(1):
         for d in dropout:
             for f in [1]:#,2,3,4,5]:
                 main(optimizer[0],numHL+1,d,f)
